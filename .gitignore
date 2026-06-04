@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+
+# Virtual environments
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+data/*.csv
+data/*.mat
+output/*.png
+output/*.pdf
+output/*.log
+# plus the Python/Jupyter/os entries from the library's .gitignore
