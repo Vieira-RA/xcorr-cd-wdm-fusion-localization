@@ -1,0 +1,9 @@
+Synthetic Validation Metrics
+============================
+Number of SOPs: 30
+Noise Std: 0.005
+DOP Mean: 0.999941
+DOP Std: 0.004874
+Power (S0) Mean: 0.999985
+Angular Error Mean (deg): 5.859
+Angular Error Std (deg): 1.666
