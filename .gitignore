@@ -21,3 +21,5 @@ output/*.png
 output/*.pdf
 output/*.log
 # plus the Python/Jupyter/os entries from the library's .gitignore
+output/
+output/
