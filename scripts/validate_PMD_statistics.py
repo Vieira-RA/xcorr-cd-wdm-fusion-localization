@@ -97,10 +97,10 @@ def validate_pmd_statistics():
     L_F = 20.0               # correlation length (metres)
     D_pmd = 3.162e-15        # 0.1 ps/√km → s/√m  (CHECK THIS VALUE!)
     lambda0 = 1550e-9
-    n_realizations = 100     # increase to 500+ for smoother curves
+    n_realizations = 250     # increase to 500+ for smoother curves
 
     mean_tau2_theory = (D_pmd**2) * L
-    x_grid = np.linspace(24.9, 25.1, 3)
+    x_grid = np.linspace(0, 10, 200)
     omega_grid = x_grid / np.sqrt(mean_tau2_theory)
 
     # ---- Run simulation ----
@@ -146,18 +146,19 @@ def validate_pmd_statistics():
     plt.plot(lags_norm, autocorr_norm, 'o-', label='Simulation')
     x_theory = np.linspace(0, lags_norm[-1], 200)
     plt.plot(x_theory, theory_acf(x_theory), 'r--', label='Theory (Eq. 17)')
+    plt.xlim([-1, 12])
     plt.xlabel('Normalized frequency lag $\\Delta\\omega \\sqrt{\\langle\\tau^2\\rangle}$')
     plt.ylabel('$\\langle \\boldsymbol{\\tau}(\\omega) \\cdot \\boldsymbol{\\tau}(\\omega+\\Delta\\omega) \\rangle / \\langle \\tau^2 \\rangle$')
     plt.legend()
     plt.grid(True)
     plt.title('PMD Vector Autocorrelation')
-    plt.savefig('pmd_autocorr.png', dpi=150)
+    plt.savefig('/home/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/validation/pmd_autocorr.png', dpi=150)
     print("Autocorrelation plot saved as 'pmd_autocorr.png'")
     plt.close()
 
     # ---- Plot 2: DGD distribution ----
     dgd_all = dgd_grid.flatten()
-    a_sim = np.sqrt(mean_tau2_sim / 3.0)
+    a_sim = np.sqrt(mean_tau2_theory / 3.0)
 
     plt.figure(figsize=(10,6))
     counts, bins, _ = plt.hist(dgd_all, bins=50, density=True, alpha=0.6, label='Simulation')
@@ -169,7 +170,7 @@ def validate_pmd_statistics():
     plt.legend()
     plt.grid(True)
     plt.title('DGD Distribution')
-    plt.savefig('dgd_distribution.png', dpi=150)
+    plt.savefig('/home/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/validation/dgd_distribution.png', dpi=150)
     print("DGD distribution plot saved as 'dgd_distribution.png'")
     plt.close()
 

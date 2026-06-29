@@ -92,7 +92,7 @@ def validate_pmd_statistics_ou():
     D_pmd = 3.162e-15
     lambda0 = 1550e-9
     n_realizations = 100
-    dz = 50               # 0.1 m → Ω ≈ 0.086 ≪ 1
+    dz = .1               # 0.1 m → Ω ≈ 0.086 ≪ 1
 
     mean_tau2_theory = (D_pmd**2) * L
     x_grid = np.linspace(24.9, 25.1, 6)
