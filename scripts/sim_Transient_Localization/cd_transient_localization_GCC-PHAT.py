@@ -3,7 +3,7 @@ Simplified multi‑channel transient birefringence modulation with CD time delay
 - Computes output SOP trajectories.
 - Rotates each trajectory so its centroid is at the North Pole.
 - Uses 2D real (S1, S2) cross‑correlation for integer‑sample peak,
-  and complex phase‑slope (frequency‑domain) for the final delay estimate.
+  and 2D GCC‑PHAT (bandwidth‑restricted) for the final delay estimate.
 - Plots rotated S1 and S2 components for all channels.
 """
 
@@ -24,7 +24,7 @@ from chromatic_dispersion import (
 )
 from visualization import plot_poincare_sphere
 from rotations import jones_to_rotation_matrix, rotate_centroid_to_north_pole
-from signal_processing import cross_correlation_2d_fft, phase_slope_delay_2d
+from signal_processing import cross_correlation_2d_fft, gcc_phat_2d
 
 # ============================================================
 # Fibre parameters
@@ -47,7 +47,7 @@ A_pulse = 10 * 3.1e-4
 # ============================================================
 # Noise parameters
 # ============================================================
-noise_std = 0.0   # Set to 0.0 for noiseless
+noise_std = 0.000001   # Set to 0.0 for noiseless
 
 # ============================================================
 # Time grid
@@ -55,7 +55,7 @@ noise_std = 0.0   # Set to 0.0 for noiseless
 fs = 30e03                      # sampling frequency (Hz) – user defined
 dt = 1.0 / fs                  # sampling interval (s)
 t_start = 0.0
-t_end = 80 * sigma_t       # total simulation duration (s)
+t_end = 80 * sigma_t           # total simulation duration (s)
 n_samples = int(t_end / dt) + 1
 t_grid = np.linspace(t_start, t_end, n_samples)
 t0 = t_end / 2
@@ -214,22 +214,24 @@ for ch in range(n_channels):
     rotation_matrices.append(R)
 
 # ============================================================
-# 2D cross‑correlation (for integer peak) and phase‑slope (for final estimate)
+# 2D cross‑correlation (for integer peak) and GCC‑PHAT (for final estimate)
 # ============================================================
 ref_idx = n_channels - 1   # channel with delay ≈ 0
 ref_2d = np.column_stack([stokes_rot[ref_idx, :, 0],
                           stokes_rot[ref_idx, :, 1]])
-Z_ref = stokes_rot[ref_idx, :, 0] + 1j * stokes_rot[ref_idx, :, 1]
 
-integer_delays = np.zeros(n_channels)   # integer‑sample lag (s)
-phase_slope_delays = np.zeros(n_channels)  # phase‑slope estimate (s)
+# Bandwidth restriction for PHAT: f_max = 2 × signal bandwidth
+f_max = 2 * bandwidth_Hz
+mag_threshold = 0.05         # keep only bins with > 5% of the peak magnitude
+
+integer_delays = np.zeros(n_channels)      # integer‑sample lag (s)
+phat_delays = np.zeros(n_channels)         # GCC‑PHAT estimate (s)
 corr_mags = []
 peak_indices = []
 
 for ch in range(n_channels):
     ch_2d = np.column_stack([stokes_rot[ch, :, 0],
                              stokes_rot[ch, :, 1]])
-    Z_ch = stokes_rot[ch, :, 0] + 1j * stokes_rot[ch, :, 1]
 
     # -- Integer peak from 2D cross‑correlation --
     lags_samples, corr = cross_correlation_2d_fft(ref_2d, ch_2d, normalize=True)
@@ -240,18 +242,18 @@ for ch in range(n_channels):
     peak_indices.append(peak_idx)
     integer_delays[ch] = lags_samples[peak_idx] * dt
 
-    # -- Phase‑slope estimate (final delay) --
-    phase_slope_delays[ch] = phase_slope_delay_2d(ref_2d, ch_2d, dt)
+    # -- GCC‑PHAT estimate (final delay) --
+    phat_delays[ch] = gcc_phat_2d(ref_2d, ch_2d, dt, f_max, mag_threshold)
 
 # ------------------------------------------------------------
 # Debug prints and plots
 # ------------------------------------------------------------
-print("\n--- Debug info (integer vs phase‑slope) ---")
+print("\n--- Debug info (integer vs GCC‑PHAT) ---")
 for ch in [0, 7]:
     int_ns = integer_delays[ch] * 1e9
-    ps_ns = phase_slope_delays[ch] * 1e9
+    phat_ns = phat_delays[ch] * 1e9
     theory_ns = channel_delays[ch] * 1e9
-    print(f"Ch {ch}: int = {int_ns:.1f} ns, phase‑slope = {ps_ns:.1f} ns, theory = {theory_ns:.1f} ns")
+    print(f"Ch {ch}: int = {int_ns:.1f} ns, PHAT = {phat_ns:.1f} ns, theory = {theory_ns:.1f} ns")
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
@@ -267,10 +269,10 @@ for ax, ch in zip(axes, [0, 7]):
     ax.plot(int_ns, abs_corr[peak_idx], 'go', markersize=10,
             label=f'Int peak: {int_ns:.1f} ns')
 
-    # Phase‑slope estimate
-    ps_ns = phase_slope_delays[ch] * 1e9
-    ax.axvline(ps_ns, color='c', linestyle='-', linewidth=2,
-               label=f'Phase slope: {ps_ns:.1f} ns')
+    # GCC‑PHAT estimate
+    phat_ns = phat_delays[ch] * 1e9
+    ax.axvline(phat_ns, color='c', linestyle='-', linewidth=2,
+               label=f'GCC-PHAT: {phat_ns:.1f} ns')
 
     # Theory
     theory_ns = channel_delays[ch] * 1e9
@@ -284,7 +286,7 @@ for ax, ch in zip(axes, [0, 7]):
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3)
 
-plt.suptitle('Cross-correlation magnitude with integer and phase‑slope estimates')
+plt.suptitle('Cross-correlation magnitude with integer and GCC‑PHAT estimates')
 plt.tight_layout()
 plt.savefig("/home/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/cross_correlation_debug.png", dpi=300)
 plt.close()
@@ -292,17 +294,17 @@ plt.close()
 print("\nDebug plot saved: /home/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/cross_correlation_debug.png")
 
 # ------------------------------------------------------------
-# Comparison table (phase‑slope as final estimate)
+# Comparison table (GCC‑PHAT as final estimate)
 # ------------------------------------------------------------
 print("\n" + "="*80)
-print("CD delay comparison: Theory vs. Estimated (phase‑slope)")
+print("CD delay comparison: Theory vs. Estimated (GCC‑PHAT)")
 print("="*80)
 print(f"{'Ch':>3}  {'λ (nm)':>9}  {'Theory (ns)':>12}  {'Est. (ns)':>12}  {'Error (ns)':>11}")
 print("-"*80)
 
 for ch in range(n_channels):
     theory_ns = channel_delays[ch] * 1e9
-    est_ns = phase_slope_delays[ch] * 1e9
+    est_ns = phat_delays[ch] * 1e9
     error_ns = est_ns - theory_ns
     print(f"{ch:3d}  {wavelengths_nm[ch]:9.1f}  {theory_ns:12.3f}  {est_ns:12.3f}  {error_ns:11.3f}")
 

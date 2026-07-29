@@ -2,10 +2,9 @@
 Simplified multi‑channel transient birefringence modulation with CD time delay.
 - Computes output SOP trajectories.
 - Rotates each trajectory so its centroid is at the North Pole.
-- Uses 2D real (S1, S2) cross‑correlation with parabolic peak fitting
-  to recover CD delays.
-- Reference channel is now channel 7 (1577.9 nm).
-- Delays can be positive or negative relative to the reference.
+- Uses 2D real (S1, S2) cross‑correlation for integer‑sample peak,
+  and complex phase‑slope (frequency‑domain) for the final delay estimate.
+- Plots rotated S1 and S2 components for all channels.
 """
 
 import matplotlib
@@ -25,7 +24,7 @@ from chromatic_dispersion import (
 )
 from visualization import plot_poincare_sphere
 from rotations import jones_to_rotation_matrix, rotate_centroid_to_north_pole
-from signal_processing import cross_correlation_2d_fft, parabolic_fit
+from signal_processing import cross_correlation_2d_fft, phase_slope_delay_2d
 
 # ============================================================
 # Fibre parameters
@@ -41,22 +40,22 @@ omega0 = 2 * np.pi * c / lambda0
 # ============================================================
 # Transient parameters
 # ============================================================
-bandwidth_Hz = 200
+bandwidth_Hz = .2e03
 sigma_t = 0.3748 / bandwidth_Hz
 A_pulse = 10 * 3.1e-4
 
 # ============================================================
 # Noise parameters
 # ============================================================
-noise_std = 0.0   # Set to 0.0 for noiseless, e.g., 0.00001 for noise
+noise_std = 0.000001   # Set to 0.0 for noiseless
 
 # ============================================================
 # Time grid
 # ============================================================
-fs = 20e3                      # sampling frequency (Hz) – user defined
+fs = 30e03                      # sampling frequency (Hz) – user defined
 dt = 1.0 / fs                  # sampling interval (s)
 t_start = 0.0
-t_end = 4 * 20 * sigma_t       # total simulation duration (s)
+t_end = 80 * sigma_t       # total simulation duration (s)
 n_samples = int(t_end / dt) + 1
 t_grid = np.linspace(t_start, t_end, n_samples)
 t0 = t_end / 2
@@ -78,7 +77,7 @@ wavelengths_nm = frequency_to_wavelength(freq_channels)
 # ============================================================
 # Generate static fibre profile
 # ============================================================
-seed = 124
+seed = 126
 z, beta0, beta_prime, L_seg = generate_pmd_waveplates(
     L, L_F, D_pmd, lambda0, seed=seed
 )
@@ -109,19 +108,16 @@ for ch_idx, omega_ch in enumerate(tqdm(omega_channels, desc="Generating Jones ma
         U_all[ch_idx, t_idx] = propagate_unitary(z, beta_t)
 
 # ============================================================
-# Chromatic dispersion delays (absolute, reference = earliest)
+# Chromatic dispersion delays
 # ============================================================
-event_distance_km = 400.0
+event_distance_km = 40.0
 channel_delays = relative_channel_delays(
     wavelengths_nm,
     event_distance_km,
 )
-# ------------------------------------------------------------
-# Make channel 7 the reference (delay = 0 for channel 7)
-# ------------------------------------------------------------
-channel_delays -= channel_delays[7]
+# channel_delays -= channel_delays[7]   # uncomment to reference ch 7
 
-print("\nChromatic-dispersion delays (reference = channel 7):")
+print("\nChromatic-dispersion delays (reference = earliest channel):")
 for f, d in zip(freq_channels / 1e12, channel_delays * 1e9):   # ns
     print(f"{f:7.3f} THz   {d:8.3f} ns")
 
@@ -218,89 +214,77 @@ for ch in range(n_channels):
     rotation_matrices.append(R)
 
 # ============================================================
-# 2D cross‑correlation with parabolic peak fitting
+# 2D cross‑correlation (for integer peak) and phase‑slope (for final estimate)
 # ============================================================
-ref_idx = 7   # channel 7 (1577.9 nm) is the new reference
+ref_idx = n_channels - 1   # channel with delay ≈ 0
 ref_2d = np.column_stack([stokes_rot[ref_idx, :, 0],
                           stokes_rot[ref_idx, :, 1]])
+Z_ref = stokes_rot[ref_idx, :, 0] + 1j * stokes_rot[ref_idx, :, 1]
 
-estimated_delays = np.zeros(n_channels)
+integer_delays = np.zeros(n_channels)   # integer‑sample lag (s)
+phase_slope_delays = np.zeros(n_channels)  # phase‑slope estimate (s)
 corr_mags = []
 peak_indices = []
 
 for ch in range(n_channels):
     ch_2d = np.column_stack([stokes_rot[ch, :, 0],
                              stokes_rot[ch, :, 1]])
-    lags_samples, corr = cross_correlation_2d_fft(ref_2d, ch_2d, normalize=True)
+    Z_ch = stokes_rot[ch, :, 0] + 1j * stokes_rot[ch, :, 1]
 
+    # -- Integer peak from 2D cross‑correlation --
+    lags_samples, corr = cross_correlation_2d_fft(ref_2d, ch_2d, normalize=True)
     abs_corr = np.abs(corr)
     corr_mags.append(abs_corr)
 
     peak_idx = np.argmax(abs_corr)
     peak_indices.append(peak_idx)
-    delta, _ = parabolic_fit(abs_corr, peak_idx)
-    lag_sub_samples = lags_samples[peak_idx] + delta
+    integer_delays[ch] = lags_samples[peak_idx] * dt
 
-    # No minus sign: lag positive means test channel is delayed relative to ref
-    estimated_delays[ch] = lag_sub_samples * dt
+    # -- Phase‑slope estimate (final delay) --
+    phase_slope_delays[ch] = phase_slope_delay_2d(ref_2d, ch_2d, dt)
 
 # ------------------------------------------------------------
-# Debug prints and plots (zoom around lag=0, now symmetric)
+# Debug prints and plots
 # ------------------------------------------------------------
-print("\n--- Debug peak info (2D real cross‑correlation) ---")
-for ch in [0, 7, 14]:
-    lag_ns = estimated_delays[ch] * 1e9
+print("\n--- Debug info (integer vs phase‑slope) ---")
+for ch in [0, 7]:
+    int_ns = integer_delays[ch] * 1e9
+    ps_ns = phase_slope_delays[ch] * 1e9
     theory_ns = channel_delays[ch] * 1e9
-    print(f"Channel {ch}: lag = {lag_ns:.1f} ns, theory = {theory_ns:.1f} ns")
+    print(f"Ch {ch}: int = {int_ns:.1f} ns, phase‑slope = {ps_ns:.1f} ns, theory = {theory_ns:.1f} ns")
 
-fig, axes = plt.subplots(1, 3, figsize=(21, 5))   # show ch 0, 7, 14
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-for ax, ch in zip(axes, [0, 7, 14]):
+for ax, ch in zip(axes, [0, 7]):
     abs_corr = corr_mags[ch]
     peak_idx = peak_indices[ch]
     lags_ns = lags_samples * dt * 1e9
 
     ax.plot(lags_ns, abs_corr, label=f'Channel {ch}', color='C0')
 
-    fit_lags = np.array([peak_idx-1, peak_idx, peak_idx+1])
-    fit_vals = abs_corr[fit_lags]
-    ax.plot(lags_samples[fit_lags] * dt * 1e9, fit_vals, 'rs', markersize=8,
-            label='Fit points')
+    # Integer peak marker
+    int_ns = integer_delays[ch] * 1e9
+    ax.plot(int_ns, abs_corr[peak_idx], 'go', markersize=10,
+            label=f'Int peak: {int_ns:.1f} ns')
 
-    y_left, y_center, y_right = fit_vals
-    denom = y_left - 2*y_center + y_right
-    if abs(denom) > 1e-15:
-        a = denom / 2.0
-        b = (y_right - y_left) / 2.0
-        c = y_center
-        delta_est = -b / (2*a)
-        peak_val = a*delta_est**2 + b*delta_est + c
-        x_fine = np.linspace(peak_idx - 1.5, peak_idx + 1.5, 100)
-        x_rel = x_fine - peak_idx
-        y_parab = a*x_rel**2 + b*x_rel + c
-        ax.plot(x_fine * dt * 1e9, y_parab, 'm--', alpha=0.7, label='Fitted parabola')
-        x_peak_sub = peak_idx + delta_est
-        ax.plot(x_peak_sub * dt * 1e9, peak_val, 'rx', markersize=10,
-                markeredgewidth=2, label='Interpolated peak')
+    # Phase‑slope estimate
+    ps_ns = phase_slope_delays[ch] * 1e9
+    ax.axvline(ps_ns, color='c', linestyle='-', linewidth=2,
+               label=f'Phase slope: {ps_ns:.1f} ns')
 
-    peak_lag_ns = estimated_delays[ch] * 1e9
-    ax.axvline(x=peak_lag_ns, color='r', linestyle='--', linewidth=2,
-               label=f'Detected peak: {peak_lag_ns:.1f} ns')
-
+    # Theory
     theory_ns = channel_delays[ch] * 1e9
-    ax.axvline(x=theory_ns, color='g', linestyle=':', linewidth=2,
+    ax.axvline(theory_ns, color='g', linestyle=':', linewidth=2,
                label=f'Theory: {theory_ns:.1f} ns')
 
-    # Zoom symmetrically around zero to see both positive and negative peaks
-    ax.set_xlim([-1000e3, 1000e3])
-
+    ax.set_xlim(-500e3, 500e3)   # zoom ±500 µs in ns
     ax.set_xlabel('Lag (ns)')
     ax.set_ylabel('Cross-correlation magnitude')
     ax.set_title(f'Channel {ch} (λ = {wavelengths_nm[ch]:.1f} nm)')
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3)
 
-plt.suptitle('Cross-correlation magnitude with parabolic fit – ref channel 7')
+plt.suptitle('Cross-correlation magnitude with integer and phase‑slope estimates')
 plt.tight_layout()
 plt.savefig("/home/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/cross_correlation_debug.png", dpi=300)
 plt.close()
@@ -308,17 +292,17 @@ plt.close()
 print("\nDebug plot saved: /home/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/cross_correlation_debug.png")
 
 # ------------------------------------------------------------
-# Comparison table (ns)
+# Comparison table (phase‑slope as final estimate)
 # ------------------------------------------------------------
 print("\n" + "="*80)
-print("CD delay comparison: Theory vs. Estimated from SOP cross-correlation")
+print("CD delay comparison: Theory vs. Estimated (phase‑slope)")
 print("="*80)
 print(f"{'Ch':>3}  {'λ (nm)':>9}  {'Theory (ns)':>12}  {'Est. (ns)':>12}  {'Error (ns)':>11}")
 print("-"*80)
 
 for ch in range(n_channels):
     theory_ns = channel_delays[ch] * 1e9
-    est_ns = estimated_delays[ch] * 1e9
+    est_ns = phase_slope_delays[ch] * 1e9
     error_ns = est_ns - theory_ns
     print(f"{ch:3d}  {wavelengths_nm[ch]:9.1f}  {theory_ns:12.3f}  {est_ns:12.3f}  {error_ns:11.3f}")
 
