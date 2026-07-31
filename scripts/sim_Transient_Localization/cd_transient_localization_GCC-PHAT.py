@@ -197,10 +197,10 @@ else:
     ax.legend(loc='upper right', fontsize=8)
 
 plt.tight_layout()
-plt.savefig("/home/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/sop_trajectories_all_channels.png", dpi=300)
+plt.savefig("/users/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/sop_trajectories_all_channels.png", dpi=300)
 plt.close()
 
-print("\nPlot saved: /home/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/sop_trajectories_all_channels.png")
+print("\nPlot saved: /users/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/sop_trajectories_all_channels.png")
 
 # ============================================================
 # Centroid rotation to North Pole (per channel)
@@ -288,10 +288,10 @@ for ax, ch in zip(axes, [0, 7]):
 
 plt.suptitle('Cross-correlation magnitude with integer and GCC‑PHAT estimates')
 plt.tight_layout()
-plt.savefig("/home/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/cross_correlation_debug.png", dpi=300)
+plt.savefig("/users/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/cross_correlation_debug.png", dpi=300)
 plt.close()
 
-print("\nDebug plot saved: /home/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/cross_correlation_debug.png")
+print("\nDebug plot saved: /users/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/cross_correlation_debug.png")
 
 # ------------------------------------------------------------
 # Comparison table (GCC‑PHAT as final estimate)
@@ -338,8 +338,8 @@ ax1.set_title('Rotated S₁ components (centroid at North Pole)')
 ax2.set_title('Rotated S₂ components (centroid at North Pole)')
 
 plt.tight_layout()
-plt.savefig("/home/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/rotated_s1_s2_components.png", dpi=300)
+plt.savefig("/users/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/rotated_s1_s2_components.png", dpi=300)
 plt.close()
 
-print("\nPlot saved: /home/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/rotated_s1_s2_components.png")
+print("\nPlot saved: /users/240404662/PhD/xcorr-cd-wdm-fusion-localization/output/sim_Transient_Localization/rotated_s1_s2_components.png")
 print("Simulation complete.")
