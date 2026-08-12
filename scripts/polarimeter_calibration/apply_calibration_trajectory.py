@@ -78,8 +78,8 @@ def load_oscilloscope_trajectory(base_dir, trajectory_idx, num_channels=4, smoot
 if __name__ == "__main__":
 
     # ------------ CONFIGURATION ------------
-    data_dir = '/home/240404662/PhD/xcorr-cd-wdm-fusion-localization/data/REFERENCED_CALIBRATION/'  # adjust
-    calibration_file = 'calibration_matrix_reference.csv'  # path to your saved 4x4 matrix
+    data_dir = '/users/240404662/PhD/xcorr-cd-wdm-fusion-localization/data/REFERENCED_CALIBRATION/'  # adjust
+    calibration_file = '/users/240404662/PhD/xcorr-cd-wdm-fusion-localization/data/REFERENCED_CALIBRATION/calibration_matrix_reference.csv'  # path to your saved 4x4 matrix
     
     # Which trajectory file to load (e.g., 0 for SOP_TRAJECTORY000)
     trajectory_idx = 0
@@ -173,6 +173,7 @@ if __name__ == "__main__":
     ax.set_ylim([-1.1, 1.1])
     ax.set_zlim([-1.1, 1.1])
     ax.set_box_aspect([1, 1, 1])
+    ax.view_init(10,35)
     
     # Add a colorbar to show time progression
     sm = plt.cm.ScalarMappable(cmap='viridis', norm=plt.Normalize(0, 1))
@@ -181,7 +182,7 @@ if __name__ == "__main__":
     cbar.set_label('Time progression')
     
     plt.tight_layout()
-    plt.savefig('poincare_trajectory_smooth.png', dpi=150)
+    plt.savefig('poincare_trajectory_smooth.png', dpi=950)
     print("\nPlot saved to 'poincare_trajectory_smooth.png'")
     plt.show()
     

@@ -1,0 +1,71 @@
+# ---------- run ----------
+run:
+  name: "baseline"            # descriptive label (optional)
+  output_base: "results"      # where to create the run folder
+
+# ---------- fibre ----------
+fibre:
+  L_km: 0.5
+  L_F: 20.0
+  D_pmd: 2.5298e-15
+  lambda0_nm: 1550
+  seed: 0
+
+# ---------- transient envelope ----------
+transient:
+  A_pulse: 0.0031
+
+# ---------- time‑grid ----------
+time:
+  fs_factor: 20
+  t_end_factor: 160
+
+# ---------- WDM channels ----------
+wdm:
+  generation: full_grid          # "full_grid" or "custom"
+  full_grid_spacing_Hz: 50e9    # used only if generation = full_grid
+  f_min_Hz: 184e12
+  f_max_Hz: 196e12
+  # when generation = "custom", the old parameters are used:
+  n_channels: 20
+  channel_grid: alternating      # "uniform" or "alternating"
+  channel_spacing_Hz: 50e9
+
+# ---------- CD event ----------
+event:
+  distance_km: 500.0
+
+# ---------- parameter sweep ----------
+sweep:
+  bandwidths:
+    start_Hz: 100
+    stop_Hz: 2_000_000
+    num: 60
+  snrs_dB:
+    start: 25
+    stop: 100
+    num: 60
+  n_realisations: 50
+  n_fibres: 10           # number of independent PMD realisations
+
+# ---------- PHAT settings ----------
+phat:
+  fmax_factor: 2.0
+  mag_threshold: 0.05
+
+# ---------- noise ----------
+noise:
+  base_seed: 0
+
+# ---------- optional pre‑processing filter ----------
+filter:
+  enabled: True
+
+# ---------- output of physical simulation ----------
+output:
+  jones_dir: "jones_data_MF"
+
+# ---------- analysis (only used in Script 2) ----------
+analysis:
+  channel_counts: [4,6,8,10,12]   # run once for each count
+  channel_selection: uniform            # "alternating", "extremes", "uniform", "first_n"

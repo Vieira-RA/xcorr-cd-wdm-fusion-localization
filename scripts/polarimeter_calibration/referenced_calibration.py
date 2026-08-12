@@ -170,8 +170,8 @@ def plot_poincare(points, labels, colors, markers, title, filename,
 if __name__ == "__main__":
 
     # --- Directories (adjust to your actual paths) ---
-    scope_data_dir = '/home/240404662/PhD/xcorr-cd-wdm-fusion-localization/data/REFERENCED_CALIBRATION/'
-    ref_data_dir = '/home/240404662/PhD/xcorr-cd-wdm-fusion-localization/data/REFERENCED_CALIBRATION/'
+    scope_data_dir = '/users/240404662/PhD/xcorr-cd-wdm-fusion-localization/data/REFERENCED_CALIBRATION/'
+    ref_data_dir = '/users/240404662/PhD/xcorr-cd-wdm-fusion-localization/data/REFERENCED_CALIBRATION/'
 
     # --- Load data ---
     D_matrix = []   # columns = raw detector vectors from scope
