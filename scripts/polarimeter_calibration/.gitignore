@@ -10,5 +10,5 @@ Python_USB_Support_Files/
 *.png
 PM_trajectory_*.txt
 
-# ... but keep the calibration matrices
-!calibration_matrix_*.csv
+# ... but keep the calibration matrix
+!calibration_matrix_reference.csv
