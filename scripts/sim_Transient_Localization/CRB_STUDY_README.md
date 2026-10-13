@@ -23,7 +23,7 @@ variance `sigma^2`.
 | Two-sensor effective SNR (sec. 3.2/3.3) | `SNR_eff(f) = rho^2/(1+2 rho)`, `rho = P_coh/(N sigma^2)` | `effective_snr_spectrum` |
 | Fisher information | `J = sum_c 2 sum_{k>0} w_k^2 SNR_eff,c[k]` | `fisher_information_delay` |
 | Distance mapping | `sigma_Z = sqrt(CRB_tau) * 1e12 / |int D dlambda|` | `crb_distance` |
-| Pair combination | inverse-variance, and correlation-aware **star** combination | `combined_crb_distance`, `star_combined_crb_distance` |
+| Pair combination | inverse-variance (naive), correlation-aware **star**, and covariance-aware **GLS** | `combined_crb_distance`, `star_combined_crb_distance`, `gls_combined_crb_distance` |
 
 Notes:
 * `P_coh(f) = | sum_c X_i,c(f) conj(X_j,c(f)) |` is the **coherent
@@ -75,8 +75,14 @@ per (fibre, bw, channel): `beta2`, `energy`; and optionally `pair_Z`
 * Std tracks the **star-combined CRB** at high SNR (ratio ~0.9–1.2 across
   bandwidths); a direct per-pair Monte-Carlo on real signals reaches
   `MC/CRB_eff ~ 1.07`.
-* The naive all-pairs inverse-variance combination is ~2x optimistic (pairs
-  share channels); the `n_ch - 1` **star** combination is the achievable bound.
+* The naive all-pairs inverse-variance combination is optimistic (pairs share
+  channels/noise, so they are correlated and only `n_ch - 1` delays are
+  independent). The covariance-aware **GLS** combination `w = Sigma_Z^+ 1`
+  (structured `Sigma_tau = A diag(u) A^T`) is tight: sim/bound ratio
+  **1.0-1.1** vs **1.5 (4ch) / 2.0 (8ch) / 2.6 (12ch)** for the naive bound,
+  matching the star combination. The GLS and naive estimators themselves
+  perform nearly identically (`est_gls` ~= `est_crb`) — the covariance model
+  fixes the *bound*, not the estimator.
 * Multi-fibre averaging follows `1/sqrt(N_fibres)`.
 * **Filtering does not move the CRB** (S/N is invariant under linear
   filtering). Empirically at the test bandwidth: no-filter ~= low-pass (3B),

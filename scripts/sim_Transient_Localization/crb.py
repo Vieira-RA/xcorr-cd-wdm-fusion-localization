@@ -286,6 +286,65 @@ def star_combined_crb_distance(crb_delay_pairs, D_abs_pairs, pair_indices,
 
 
 # ---------------------------------------------------------------------------
+# covariance-aware (GLS) combination
+# ---------------------------------------------------------------------------
+def _incidence(pair_indices, n_channels):
+    """Signed incidence matrix A with A[k, i]=+1, A[k, j]=-1 for pair (i,j)."""
+    A = np.zeros((len(pair_indices), n_channels))
+    for k, (i, j) in enumerate(pair_indices):
+        A[k, i] = 1.0
+        A[k, j] = -1.0
+    return A
+
+
+def per_channel_variances(crb_delay_pairs, pair_indices, n_channels,
+                          nonneg=True):
+    """
+    Per-channel delay variances u_k such that Var(tau_ij) = u_i + u_j
+    (which holds for the two-sensor effective SNR at high SNR).  Fitted by
+    least squares to the per-pair CRBs.
+    """
+    A = np.zeros((len(pair_indices), n_channels))
+    for k, (i, j) in enumerate(pair_indices):
+        A[k, i] = 1.0
+        A[k, j] = 1.0
+    u, *_ = np.linalg.lstsq(A, np.asarray(crb_delay_pairs, dtype=float),
+                            rcond=None)
+    if nonneg:
+        u = np.clip(u, 0.0, None)
+    return u
+
+
+def gls_combined_crb_distance(crb_delay_pairs, D_abs_pairs, pair_indices,
+                              n_channels):
+    """
+    Covariance-aware (GLS) bound and weights for the combined distance.
+
+    Model: the per-pair error is a signed combination of independent
+    per-channel timing errors, so Cov(tau) = A diag(u) A^T is rank n_ch - 1.
+    In distance units Sigma_Z = diag(c/D) Cov(tau) diag(c/D), c = 1e12.
+    The GLS estimator is Zhat = sum_k w_k Z_k / sum_k w_k with w = Sigma_Z^+ 1,
+    and its variance is 1 / (1^T Sigma_Z^+ 1).
+
+    Returns
+    -------
+    sigma_Z : float  combined distance std (km)
+    weights : (n_pairs,) GLS weights (equal for identical D and CRB)
+    """
+    crb_delay_pairs = np.asarray(crb_delay_pairs, dtype=float)
+    D_abs_pairs = np.asarray(D_abs_pairs, dtype=float)
+    u = per_channel_variances(crb_delay_pairs, pair_indices, n_channels)
+    A = _incidence(pair_indices, n_channels)
+    Sigma_tau = (A * u[None, :]) @ A.T
+    B = 1e12 / np.abs(D_abs_pairs)
+    Sigma_Z = Sigma_tau * np.outer(B, B)
+    ones = np.ones(len(pair_indices))
+    w = np.linalg.pinv(Sigma_Z) @ ones
+    var = 1.0 / (ones @ w)
+    return np.sqrt(var), w
+
+
+# ---------------------------------------------------------------------------
 # CRB-optimal (inverse-variance) distance estimator
 # ---------------------------------------------------------------------------
 def crb_weighted_mean(distances, D_abs, crb_delay_pairs, inlier_mask=None):

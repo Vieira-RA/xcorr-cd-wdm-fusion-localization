@@ -99,7 +99,7 @@ def plot_std_vs_snr(std, crb_eff, crb_det, SNRS, BW, bw_indices, title, filename
     ax.grid(True, which="both", alpha=0.3)
     from matplotlib.lines import Line2D
     handles = [Line2D([0], [0], color="k", ls="--", lw=1.2,
-                      label="CRB star-combined"),
+                      label="CRB GLS (covariance)"),
                Line2D([0], [0], color="k", ls=":", lw=1.0,
                       label="CRB deterministic")]
     ax.legend(handles=handles + ax.get_legend_handles_labels()[0],
@@ -110,11 +110,15 @@ def plot_std_vs_snr(std, crb_eff, crb_det, SNRS, BW, bw_indices, title, filename
 
 
 def plot_estimators(d, ib, SNRS, BW, title, filename):
-    """Std vs SNR for the three estimators at one bandwidth."""
+    """Std vs SNR for the estimators at one bandwidth."""
     fig, ax = plt.subplots(figsize=(8.2, 6))
-    for key, lab, sty in [("est_crb", "inverse-variance (CRB)", "o-"),
-                          ("est_lambda", r"wavelength-separation ($D^2$)", "s--"),
-                          ("est_crb_iqr", "inverse-variance + IQR", "^:")]:
+    series = [("est_crb", "inverse-variance (CRB)", "o-"),
+              ("est_gls", "GLS (covariance)", "d-"),
+              ("est_lambda", r"wavelength-separation ($D^2$)", "s--"),
+              ("est_crb_iqr", "inverse-variance + IQR", "^:")]
+    for key, lab, sty in series:
+        if key not in d.files:
+            continue
         std = np.nanmean(np.nanstd(d[key], axis=-1), axis=0)[ib]
         ax.loglog(SNRS, std, sty, ms=4, label=lab)
     ax.set_xlabel("SNR (dB)")
@@ -213,6 +217,17 @@ def main(config_path):
                     crb_star[f, ib, is_] = crb.star_combined_crb_distance(
                         cd_pairs[f, ib, is_], D_abs, pair_idx, count)
 
+        # covariance-aware (GLS) bound
+        if "crb_dist_combined_gls" in d.files:
+            crb_gls = d["crb_dist_combined_gls"]
+        else:
+            crb_gls = np.full_like(crb_eff, np.nan)
+            for f in range(nf):
+                for ib in range(len(BW)):
+                    for is_ in range(len(SNRS)):
+                        crb_gls[f, ib, is_] = crb.gls_combined_crb_distance(
+                            cd_pairs[f, ib, is_], D_abs, pair_idx, count)[0]
+
         std = nanstd(est, axis=-1)               # (nf, nbw, nsnr)
         bias = np.nanmean(est, axis=-1) - true_dist
 
@@ -222,11 +237,12 @@ def main(config_path):
         crb_eff_f = np.nanmean(crb_eff, axis=0)
         crb_det_f = np.nanmean(crb_det, axis=0)
         crb_star_f = np.nanmean(crb_star, axis=0)
-        collected[count] = (std_f, crb_star_f, bias_f, SNRS, BW)
+        crb_gls_f = np.nanmean(crb_gls, axis=0)
+        collected[count] = (std_f, crb_gls_f, bias_f, SNRS, BW)
 
         prefix = os.path.join(run_dir, f"fig_{count}ch")
-        plot_std_with_crb(std_f, crb_star_f, SNRS, BW,
-                          f"{count} ch | std (km), CRB (star) contours",
+        plot_std_with_crb(std_f, crb_gls_f, SNRS, BW,
+                          f"{count} ch | std (km), CRB (GLS) contours",
                           prefix + "_std_crb.png")
         plot_bias(bias_f, SNRS, BW,
                   f"{count} ch | bias (km)", prefix + "_bias.png")
@@ -234,7 +250,7 @@ def main(config_path):
         # std vs SNR at three bandwidths
         n_bw = len(BW)
         bw_idx = [int(n_bw * 0.2), int(n_bw * 0.5), int(n_bw * 0.8)]
-        plot_std_vs_snr(std_f, crb_star_f, crb_det_f, SNRS, BW, bw_idx,
+        plot_std_vs_snr(std_f, crb_gls_f, crb_det_f, SNRS, BW, bw_idx,
                         f"{count} ch | std vs SNR", prefix + "_std_vs_snr.png")
         plot_estimators(d, bw_idx[-1], SNRS, BW,
                         f"{count} ch | estimator comparison",
@@ -248,7 +264,7 @@ def main(config_path):
             std_by_nf[n] = nanstd(comb, axis=-1)
         is_ref = int(np.argmin(np.abs(SNRS - 80.0)))
         ib_ref = int(np.argmin(np.abs(np.log(BW) - np.log(np.sqrt(BW[0] * BW[-1])))))
-        plot_vs_nfibres(std_by_nf, n_list, crb_star_f, ib_ref, is_ref,
+        plot_vs_nfibres(std_by_nf, n_list, crb_gls_f, ib_ref, is_ref,
                         f"{count} ch | std vs fibres (B={BW[ib_ref]:.3g} Hz, "
                         f"SNR={SNRS[is_ref]:.0f} dB)",
                         prefix + "_vs_nfibres.png")
@@ -259,7 +275,7 @@ def main(config_path):
             SNRS_dB=SNRS, BANDWIDTHS=BW, true_dist=true_dist,
             std_per_fibre=std, bias_per_fibre=bias,
             std_fibre_avg=std_f, bias_fibre_avg=bias_f,
-            crb_star_fibre_avg=crb_star_f,
+            crb_star_fibre_avg=crb_star_f, crb_gls_fibre_avg=crb_gls_f,
             crb_eff_fibre_avg=crb_eff_f, crb_det_fibre_avg=crb_det_f,
             n_fibres_list=np.array(n_list),
         )

@@ -86,7 +86,7 @@ def apply_filter(sig, ba):
 
 
 # ---------------------------------------------------------------------------
-def process_one(clean2d, sigma2, pair_indices, D_abs, crb_dist_pair,
+def process_one(clean2d, sigma2, pair_indices, D_abs, crb_dist_pair, w_gls,
                 dt, ba, i_snr, i_real, seed):
     """One (SNR, realisation) for a given bandwidth. Returns estimates + Zs."""
     rng = np.random.RandomState(seed)
@@ -104,6 +104,9 @@ def process_one(clean2d, sigma2, pair_indices, D_abs, crb_dist_pair,
     w_crb = 1.0 / crb_dist_pair ** 2
     est_crb = np.sum(w_crb * Z) / np.sum(w_crb)
 
+    # covariance-aware (GLS) weights
+    est_gls = np.sum(w_gls * Z) / np.sum(w_gls)
+
     # wavelength-separation weights (existing estimator)
     w_lam = D_abs ** 2
     est_lambda = np.sum(w_lam * Z) / np.sum(w_lam)
@@ -116,7 +119,7 @@ def process_one(clean2d, sigma2, pair_indices, D_abs, crb_dist_pair,
     else:
         est_crb_iqr = np.nan
 
-    return est_crb, est_lambda, est_crb_iqr, Z
+    return est_crb, est_gls, est_lambda, est_crb_iqr, Z
 
 
 # ---------------------------------------------------------------------------
@@ -204,10 +207,15 @@ def main(config_path):
             est_crb_a = st["est_crb"]
             est_lam_a = st["est_lambda"]
             est_crb_iqr_a = st["est_crb_iqr"]
+            est_gls_a = (st["est_gls"] if "est_gls" in st.files else
+                         np.full((n_fibres, n_bw, n_snr, N_REAL), np.nan))
             crb_delay_pairs = st["crb_delay_pairs"]
             crb_dist_pairs = st["crb_dist_pairs"]
             crb_eff_comb = st["crb_dist_combined_eff"]
             crb_det_comb = st["crb_dist_combined_det"]
+            crb_gls_comb = (st["crb_dist_combined_gls"]
+                            if "crb_dist_combined_gls" in st.files else
+                            np.full((n_fibres, n_bw, n_snr), np.nan))
             sigma2_a = st["sigma2"]
             beta2_a = st["beta2"]
             energy_a = st["energy"]
@@ -220,10 +228,12 @@ def main(config_path):
             est_crb_a = np.full(shape, np.nan)
             est_lam_a = np.full(shape, np.nan)
             est_crb_iqr_a = np.full(shape, np.nan)
+            est_gls_a = np.full(shape, np.nan)
             crb_delay_pairs = np.full((n_fibres, n_bw, n_snr, n_pairs), np.nan)
             crb_dist_pairs = np.full((n_fibres, n_bw, n_snr, n_pairs), np.nan)
             crb_eff_comb = np.full((n_fibres, n_bw, n_snr), np.nan)
             crb_det_comb = np.full((n_fibres, n_bw, n_snr), np.nan)
+            crb_gls_comb = np.full((n_fibres, n_bw, n_snr), np.nan)
             sigma2_a = np.full((n_fibres, n_bw, n_snr), np.nan)
             beta2_a = np.full((n_fibres, n_bw, n_ch), np.nan)
             energy_a = np.full((n_fibres, n_bw, n_ch), np.nan)
@@ -233,11 +243,13 @@ def main(config_path):
 
         def save_checkpoint(done):
             d = dict(meta_common)
-            d.update(est_crb=est_crb_a, est_lambda=est_lam_a,
+            d.update(est_crb=est_crb_a, est_gls=est_gls_a,
+                     est_lambda=est_lam_a,
                      est_crb_iqr=est_crb_iqr_a, crb_delay_pairs=crb_delay_pairs,
                      crb_dist_pairs=crb_dist_pairs,
                      crb_dist_combined_eff=crb_eff_comb,
                      crb_dist_combined_det=crb_det_comb,
+                     crb_dist_combined_gls=crb_gls_comb,
                      sigma2=sigma2_a, beta2=beta2_a, energy=energy_a,
                      completed=np.array(sorted(done)))
             if store_pairs:
@@ -290,22 +302,26 @@ def main(config_path):
                         cd, D_abs)
                     crb_det_comb[i_f, i_bw, i_snr] = crb.combined_crb_distance(
                         cdet, D_abs)
+                    gls_std, w_gls = crb.gls_combined_crb_distance(
+                        cd, D_abs, pair_indices, n_ch)
+                    crb_gls_comb[i_f, i_bw, i_snr] = gls_std
 
-                    snr_meta.append((i_snr, sigma2, cdp))
+                    snr_meta.append((i_snr, sigma2, cdp, w_gls))
                     for r in range(N_REAL):
                         jobs.append(delayed(process_one)(
-                            clean2d, sigma2, pair_indices, D_abs, cdp,
+                            clean2d, sigma2, pair_indices, D_abs, cdp, w_gls,
                             dt, ba, i_snr, r, noise_seed + i_f * 100003 + r
                         ))
 
                 results = Parallel(n_jobs=n_jobs, batch_size=1)(jobs)
 
                 idx = 0
-                for (i_snr, sigma2, cdp) in snr_meta:
+                for (i_snr, sigma2, cdp, w_gls) in snr_meta:
                     for r in range(N_REAL):
-                        e_crb, e_lam, e_iqr, Z = results[idx]
+                        e_crb, e_gls, e_lam, e_iqr, Z = results[idx]
                         idx += 1
                         est_crb_a[i_f, i_bw, i_snr, r] = e_crb
+                        est_gls_a[i_f, i_bw, i_snr, r] = e_gls
                         est_lam_a[i_f, i_bw, i_snr, r] = e_lam
                         est_crb_iqr_a[i_f, i_bw, i_snr, r] = e_iqr
                         if store_pairs:
@@ -318,10 +334,12 @@ def main(config_path):
         out = os.path.join(run_dir, f"crb_results_{count}ch.npz")
         save_dict = dict(meta_common)
         save_dict.update(
-            est_crb=est_crb_a, est_lambda=est_lam_a, est_crb_iqr=est_crb_iqr_a,
+            est_crb=est_crb_a, est_gls=est_gls_a, est_lambda=est_lam_a,
+            est_crb_iqr=est_crb_iqr_a,
             crb_delay_pairs=crb_delay_pairs, crb_dist_pairs=crb_dist_pairs,
             crb_dist_combined_eff=crb_eff_comb,
             crb_dist_combined_det=crb_det_comb,
+            crb_dist_combined_gls=crb_gls_comb,
             sigma2=sigma2_a, beta2=beta2_a, energy=energy_a,
         )
         if store_pairs:
