@@ -135,6 +135,7 @@ All fusion rules below need **no SNR knowledge** — only the dispersion integra
 | estimator | weights | notes |
 |---|---|---|
 | `single` | one pair (max `D`) | best single measurement, baseline |
+| `single (worst)` | one pair (min `D`) | worst single measurement, baseline |
 | `average` | equal | naive fusion |
 | `disp` | `w ∝ D²` | inverse-variance from dispersion (BLUE if CRB common) |
 | `robust` | `w ∝ D² · Tukey-bisquare` | smooth down-weighting of outliers (prior-study scheme) |

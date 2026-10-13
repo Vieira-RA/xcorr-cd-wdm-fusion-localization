@@ -47,17 +47,23 @@ plt.rcParams.update({
     "axes.grid": True, "grid.alpha": 0.25, "grid.linewidth": 0.6,
     "axes.linewidth": 0.9, "lines.linewidth": 1.8, "legend.frameon": False,
 })
-COL = {"single": "#D55E00", "average": "#0072B2", "disp": "#009E73",
-       "robust": "#CC79A7"}
-LBL = {"single": "single best pair", "average": "pure average",
-       "disp": r"$D^2$-weighted", "robust": r"$D^2$ + bisquare (robust)"}
-MARK = {"single": "v", "average": "o", "disp": "s", "robust": "D"}
+COL = {"single_worst": "#7F7F7F", "single": "#D55E00", "average": "#0072B2",
+       "disp": "#009E73", "robust": "#CC79A7"}
+LBL = {"single_worst": "single worst pair", "single": "single best pair",
+       "average": "pure average", "disp": r"$D^2$-weighted",
+       "robust": r"$D^2$ + bisquare (robust)"}
+MARK = {"single_worst": "x", "single": "v", "average": "o", "disp": "s",
+        "robust": "D"}
+ESTS = ["single_worst", "single", "average", "disp", "robust"]
 
 
 # ------------------------------ estimators --------------------------------
-def combine_estimators(Zp, D2, kbest, c=2.5, iqr_factor=1.5):
+def combine_estimators(Zp, D2, kbest, kworst=None, c=2.5, iqr_factor=1.5):
     """Zp: (..., npairs) distance estimates. Returns dict of (..) arrays."""
+    if kworst is None:
+        kworst = int(np.argmin(D2))
     out = {}
+    out["single_worst"] = Zp[..., kworst]
     out["single"] = Zp[..., kbest]
     out["average"] = np.nanmean(Zp, axis=-1)
     out["disp"] = (np.nansum(D2 * Zp, axis=-1)
@@ -110,7 +116,7 @@ def fig1_money(res, counts, BW, SNRS, embed_dir):
     bw_idx = [int(nb * 0.2), int(nb * 0.5), int(nb * 0.8)]
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.4), sharey=True)
     for ax, ib in zip(axes, bw_idx):
-        for est in ["single", "average", "disp", "robust"]:
+        for est in ESTS:
             ax.semilogy(SNRS, r["rmse"][est][ib], marker=MARK[est], ms=4,
                         color=COL[est], label=LBL[est])
         ax.semilogy(SNRS, r["crb"][ib], "k--", lw=1.4, label="CRB (GLS)")
@@ -126,14 +132,17 @@ def fig1_money(res, counts, BW, SNRS, embed_dir):
 
 def fig2_ratio_maps(res, counts, BW, SNRS, embed_dir):
     key = counts[-1]; r = res[key]
-    ratios = [r["rmse"]["single"] / r["rmse"]["robust"],
+    ratios = [r["rmse"]["single_worst"] / r["rmse"]["robust"],
+              r["rmse"]["single"] / r["rmse"]["robust"],
               r["rmse"]["average"] / r["rmse"]["robust"]]
-    titles = ["single pair / robust", "pure average / robust"]
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), sharey=True)
+    titles = ["worst single pair / robust", "best single pair / robust",
+              "pure average / robust"]
+    fig, axes = plt.subplots(1, 3, figsize=(16, 4.8), sharey=True)
     X, Y = np.meshgrid(SNRS, BW)
+    vmax = np.nanmax([np.nanmax(R) for R in ratios])
     for ax, R, t in zip(axes, ratios, titles):
         pc = ax.pcolormesh(X, Y, R, shading="auto", cmap="magma",
-                           norm=LogNorm(vmin=1.0, vmax=np.nanmax(R)))
+                           norm=LogNorm(vmin=1.0, vmax=vmax))
         ax.set_yscale("log"); ax.set_xlabel("SNR (dB)"); ax.set_title(t)
         fig.colorbar(pc, ax=ax, label="RMSE ratio")
     axes[0].set_ylabel("Bandwidth (Hz)")
@@ -145,7 +154,7 @@ def fig2_ratio_maps(res, counts, BW, SNRS, embed_dir):
 def fig3_isoprecision(res, counts, BW, SNRS, embed_dir, target=1.0):
     key = counts[-1]; r = res[key]
     fig, ax = plt.subplots(figsize=(7.4, 5.4))
-    for est in ["single", "average", "disp", "robust"]:
+    for est in ESTS:
         need = np.full(len(BW), np.nan)
         for ib in range(len(BW)):
             y = r["rmse"][est][ib]
@@ -174,7 +183,7 @@ def fig4_db_gain(res, counts, BW, SNRS, embed_dir, ib=None):
         ib = len(BW) // 2
     is_ref = int(np.argmin(np.abs(SNRS - 80.0)))
     fig, ax = plt.subplots(figsize=(7.4, 5.2))
-    for est in ["single", "average", "disp"]:
+    for est in ["single_worst", "single", "average", "disp"]:
         gains = [20 * np.log10(res[c]["rmse"][est][ib, is_ref]
                                / res[c]["rmse"]["robust"][ib, is_ref])
                  for c in counts]
@@ -198,18 +207,17 @@ def fig5_distributions(d, pair_D, kbest, embed_dir, ib=None, is_=None,
         is_ = int(np.argmin(np.abs(SNRS - 35.0)))
     Zp = d["pair_Z"][:, ib, is_, :, :]           # (nf, nreal, npairs)
     D2 = pair_D ** 2
-    est = combine_estimators(Zp, D2, kbest, c, iqr_factor)
+    est = combine_estimators(Zp, D2, kbest, c=c, iqr_factor=iqr_factor)
     fig, ax = plt.subplots(figsize=(7.4, 5.2))
-    data = [np.ravel(est[k] - Ztrue) for k in ["single", "average", "disp", "robust"]]
+    data = [np.ravel(est[k] - Ztrue) for k in ESTS]
     parts = ax.violinplot(data, showextrema=False, widths=0.85)
-    for b, k in zip(parts["bodies"], ["single", "average", "disp", "robust"]):
+    for b, k in zip(parts["bodies"], ESTS):
         b.set_facecolor(COL[k]); b.set_alpha(0.6)
-    for i, (k, dd) in enumerate(zip(["single", "average", "disp", "robust"], data)):
+    for i, (k, dd) in enumerate(zip(ESTS, data)):
         ax.scatter([i + 1], [np.nanmedian(dd)], color="k", zorder=3, s=18)
     ax.axhline(0, color="k", lw=0.8)
-    ax.set_xticks([1, 2, 3, 4])
-    ax.set_xticklabels([LBL[k] for k in ["single", "average", "disp", "robust"]],
-                       rotation=15, ha="right")
+    ax.set_xticks(list(range(1, len(ESTS) + 1)))
+    ax.set_xticklabels([LBL[k] for k in ESTS], rotation=15, ha="right")
     ax.set_ylabel("error  Z - Ztrue  (km)")
     ax.set_ylim(-200, 200)
     ax.set_title("Error distribution at threshold (B=%.3g Hz, SNR=%.0f dB)"
@@ -221,7 +229,7 @@ def fig5_distributions(d, pair_D, kbest, embed_dir, ib=None, is_=None,
 def fig6_gap(res, counts, BW, SNRS, embed_dir):
     key = counts[-1]; r = res[key]; ib = len(BW) // 2
     fig, ax = plt.subplots(figsize=(7.4, 5.2))
-    for est in ["single", "average", "disp", "robust"]:
+    for est in ESTS:
         ax.semilogy(SNRS, r["rmse"][est][ib] / r["crb"][ib],
                     marker=MARK[est], ms=4, color=COL[est], label=LBL[est])
     ax.axhline(1.0, color="k", ls="--", lw=1.2, label="CRB (GLS)")
