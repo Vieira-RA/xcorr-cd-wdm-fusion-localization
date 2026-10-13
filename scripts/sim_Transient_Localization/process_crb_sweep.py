@@ -149,7 +149,9 @@ def main(config_path):
     jones_dir = cfg["output"]["jones_dir"]
     run_dir = cfg["output"].get("run_dir", "results_crb")
     save_pairs = cfg.get("output", {}).get("save_pairs", "all")
-    n_jobs = int(cfg.get("run", {}).get("n_jobs", -1))
+    # joblib workers: CRB_N_JOBS env var (HPC/SLURM) overrides the config
+    n_jobs = int(os.environ.get("CRB_N_JOBS",
+                                cfg.get("run", {}).get("n_jobs", -1)))
     os.makedirs(run_dir, exist_ok=True)
 
     meta = np.load(os.path.join(jones_dir, "metadata.npz"), allow_pickle=True)

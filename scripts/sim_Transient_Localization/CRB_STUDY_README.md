@@ -87,44 +87,39 @@ per (fibre, bw, channel): `beta2`, `energy`; and optionally `pair_Z`
 
 ## 6. HPC run (final study)
 
-The pipeline is self-contained and checkpointed, so it is safe to resubmit.
+`run_crb_hpc.sh` is a **SLURM batch script** (16 cores, 32 GB, 24 h), matching
+the cluster setup of `run_sweep.sh` (conda env `phd_env`, repo at
+`~/PhD/xcorr-cd-wdm-fusion-localization`). Edit the config, then submit:
 
 ```bash
-./run_crb_hpc.sh sweep_config_crb.yaml
+sbatch run_crb_hpc.sh
+tail -f crb_sweep_<jobid>.log
 ```
 
-Requirements: `numpy scipy matplotlib pyyaml tqdm joblib` and the
-`sop-simulation-lib` importable (editable install or `PYTHONPATH` to its `src`).
-Python 3.8+ is fine (the library now uses `from __future__ import annotations`).
+It runs three stages in order, each guarded by a flag at the top of the script
+(`RUN_GENERATOR`, `RUN_PROCESSOR`, `RUN_ANALYSIS`) and error-checked:
+**generate → process → analyse**.
+
+* Stage 1 (generation) uses multithreaded BLAS for the batched tree-product.
+* Stage 2 (Monte-Carlo) runs one BLAS thread per joblib worker; the worker count
+  is `CRB_N_JOBS` (set to `$SLURM_CPUS_PER_TASK` in the script), which overrides
+  `run.n_jobs` in the config.
+* Stage 2 is **checkpointed per fibre** (`ckpt_<n>ch.npz`, removed on
+  completion), so a resubmission resumes where it stopped.
+
+There is also a built-in import sanity check — if `sop-simulation-lib` isn't
+installed in `phd_env` the job aborts immediately with a clear message.
+Requirements: `numpy scipy matplotlib pyyaml tqdm joblib` + `sop-simulation-lib`
+editable install (or `PYTHONPATH` to its `src`).
 
 Key config knobs (`sweep_config_crb.yaml`):
-* `run.n_jobs` — parallel workers for the Monte-Carlo stage (set to
-  `$SLURM_CPUS_PER_TASK`).
 * `sweep.n_fibres`, `sweep.n_realisations`, grid `num`s, `analysis.channel_counts`.
-* `output.save_pairs` — `"all"` keeps every per-pair distance (large);
-  `"none"` keeps only the aggregated + CRB arrays.
+* `output.save_pairs` — `"none"` keeps the per-realisation estimates + CRB
+  arrays only; `"all"` also stores every per-pair distance (much larger).
 * `filter.mode` — `"none"` for the canonical bound study.
 
-Stage costs (single node): generation is serial ODE integration
-(~1 min per fibre·bandwidth·12 channels here); the Monte-Carlo stage dominates
-and scales with `n_fibres × n_bandwidths × n_snrs × n_realisations × pairs`
-and parallelises over realisations / cores. A `ckpt_<n>ch.npz` checkpoint is
-written after each fibre and removed on completion; if the job dies, rerun the
-same command to resume.
-
-SLURM example:
-
-```bash
-#!/bin/bash
-#SBATCH --job-name=crb
-#SBATCH --cpus-per-task=32
-#SBATCH --mem=16G
-#SBATCH --time=24:00:00
-module load python
-export PYTHONPATH=/path/to/sop-simulation-lib/src:$PYTHONPATH
-python -c "import yaml,json; p='sweep_config_crb.yaml'; c=yaml.safe_load(open(p)); c['run']['n_jobs']=32; yaml.safe_dump(c,open(p,'w'))"
-./run_crb_hpc.sh sweep_config_crb.yaml
-```
+Non-SLURM (interactive) use: `bash run_crb_hpc.sh` still works; it is a normal
+shell script.
 
 ## 7. Notes
 
