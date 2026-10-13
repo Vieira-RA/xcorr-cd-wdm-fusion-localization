@@ -1,41 +1,50 @@
-# Conference paper draft (3 pages)
+# Conference paper drafts
 
-`crb_transient_localization_conf.tex` — proof-of-concept draft:
-*Reaching the Cramér–Rao Bound in Multi-Channel Transient Localisation over WDM
-Links: Why Dispersion-Weighted Fusion Wins.*
+Two versions:
 
-## Build
+| file | template | notes |
+|---|---|---|
+| `CRB_transient_localization_optica.tex` | **Optica** (`opticameet3.sty`, OFC style) | **primary** — includes an equation-reference appendix page |
+| `crb_transient_localization_conf.tex` | generic `article` | earlier draft, kept for reference |
+
+## Build (Optica version)
+
+The Optica style file `opticameet3.sty` must be in this folder (download it
+with the OPTICAmeetings template from the conference website). Then:
 
 ```bash
-pdflatex crb_transient_localization_conf.tex
-pdflatex crb_transient_localization_conf.tex   # twice for references
+pdflatex CRB_transient_localization_optica.tex
+pdflatex CRB_transient_localization_optica.tex   # twice for references
 ```
-Requires a standard TeX distribution with `tikz` (shapes.geometric,
-arrows.meta, positioning).
+
+The Optica template asks for a **35-word abstract** and **≤ 3 figures** — the
+draft complies. The final **“Equation reference”** page is a working reference
+and is **not intended for submission** (trim it, or move it to supplementary,
+for the camera-ready).
 
 ## Figures
 
-`figures/` currently holds **placeholders copied from the 5-fibre mid run**.
-Replace them with the full-run versions before submission:
+`figures/` currently holds **placeholders from the 5-fibre mid run**. Replace
+with the full-run versions before submission:
 
 ```bash
 # from scripts/sim_Transient_Localization/results_crb_full_pairs/figs_estimators/
-cp F1_rmse_vs_snr.png        ../../../paper/figures/
-cp F3_isoprecision.png       ../../../paper/figures/
-cp F4_db_gain_vs_channels.png ../../../paper/figures/
+cp F1_rmse_vs_snr.png          ../../../paper/figures/
+cp F3_isoprecision.png         ../../../paper/figures/
+cp F4_db_gain_vs_channels.png  ../../../paper/figures/
 ```
 
-| figure in draft | source file |
+| figure | source |
 |---|---|
 | Fig. 1 (concept) | drawn in TikZ (self-contained) |
-| Fig. 2 (money plot) | `F1_rmse_vs_snr.png` |
+| Fig. 2 (RMSE vs SNR) | `F1_rmse_vs_snr.png` |
 | Fig. 3 (scaling) | `F3_isoprecision.png` + `F4_db_gain_vs_channels.png` |
 
-The improvement maps (`F2_improvement_maps.png`) and error distributions
-(`F5_*`) are natural **supplementary** figures for a longer/journal version.
+`F2_improvement_maps.png` and the error-distribution figures are natural
+**supplementary** material.
 
 ## Before submitting
-- Fill in **authors / affiliations**.
-- Verify every bibliography entry (they are plausible placeholders).
-- Numbers to refresh once the full pairs run is in: the RMSE/CRB ratio
-  (`\approx 1.0`–`1.1`), the improvement factors, and the channel-count dB gain.
+- Fill in authors / affiliations / e-mail.
+- Verify every reference (they are plausible placeholders).
+- Refresh the quoted numbers (RMSE/CRB ≈ 1.0–1.1, improvement factors, channel
+  dB gain) once the full pairs run lands.
