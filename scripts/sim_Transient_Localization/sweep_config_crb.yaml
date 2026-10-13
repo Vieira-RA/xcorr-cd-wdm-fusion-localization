@@ -57,4 +57,5 @@ analysis:
 output:
   jones_dir: "jones_data_crb_full"
   run_dir: "results_crb_full"
-  save_pairs: "all"        # keep every per-pair distance for offline re-analysis
+  save_pairs: "none"       # save per-realisation distance estimates + CRB arrays only
+                           # (use "all" on a small grid if pair-level data is needed)
