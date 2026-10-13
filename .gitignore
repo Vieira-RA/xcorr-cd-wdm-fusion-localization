@@ -41,6 +41,8 @@ full4Darrays_analysis.py   # if this is a temporary analysis script, you can kee
 
 # Images (all PNGs – you can be more specific if you keep some)
 *.png
+# ... but keep the paper figures
+!paper/figures/*.png
 
 # Backup files (optional)
 process_sweep_BACKUP.py
