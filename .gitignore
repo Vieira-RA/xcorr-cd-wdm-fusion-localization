@@ -30,6 +30,9 @@ jones_data_MF/
 jones_data_MF_noFilter/
 sweep_results.npz
 sweep_rotvec.npz
+# CRB study generated results / data
+scripts/sim_Transient_Localization/results_crb_*/
+scripts/sim_Transient_Localization/jones_data_crb_*/
 full4Darrays_analysis.py   # if this is a temporary analysis script, you can keep or ignore
 
 # Logs and errors

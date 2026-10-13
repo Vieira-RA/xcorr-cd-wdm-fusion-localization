@@ -1,0 +1,70 @@
+# ---------------------------------------------------------------------------
+# CRB study - small test-scale configuration
+# Reproduces the SNR / effective-SNR / mean-square-bandwidth definitions of
+# "CRB for Time-Delay Estimation - Simple Summary".
+# ---------------------------------------------------------------------------
+run:
+  name: "crb_test"
+
+# ---------- fibre (disturbed section) ----------
+fibre:
+  L_km: 0.5              # length of the disturbed section
+  L_F: 20.0              # birefringence correlation length [m]
+  D_pmd: 2.5298e-15
+  lambda0_nm: 1550
+  seed: 0
+
+# ---------- transient envelope (sigma_t = 0.3748 / bandwidth) ----------
+transient:
+  A_pulse: 0.0031
+
+# ---------- time grid ----------
+time:
+  fs_factor: 20          # fs = fs_factor * bandwidth
+  t_end_factor: 160      # t_end = t_end_factor * sigma_t
+
+# ---------- WDM channels ----------
+wdm:
+  generation: full_grid
+  full_grid_spacing_Hz: 50e9
+  f_min_Hz: 184e12
+  f_max_Hz: 196e12
+
+# ---------- CD event ----------
+event:
+  distance_km: 500.0     # position of the disturbed section
+
+# ---------- parameter sweep ----------
+sweep:
+  bandwidths:
+    start_Hz: 100.0
+    stop_Hz: 2.0e6
+    num: 24
+  snrs_dB:
+    start: 0.0           # energy SNR E/N0
+    stop: 100.0
+    num: 24
+  n_realisations: 50
+  n_fibres: 2
+
+# ---------- noise ----------
+noise:
+  base_seed: 0
+
+# ---------- pre-processing filter ----------
+# mode: "none" | "lowpass" | "bandpass"
+filter:
+  mode: "none"
+  order: 4
+  low_factor: 0.5        # bandpass low edge = low_factor * bandwidth
+  high_factor: 3.0       # lowpass / bandpass high edge = high_factor * bandwidth
+
+# ---------- analysis ----------
+analysis:
+  channel_counts: [4, 8]
+  channel_selection: alternating
+
+# ---------- output ----------
+output:
+  jones_dir: "jones_data_crb_test"
+  run_dir: "results_crb_test"
