@@ -7,7 +7,7 @@
 #SBATCH --error=crb_sweep_%j.err
 
 # ====================== Configuration ======================
-CONFIG=sweep_config_crb.yaml
+CONFIG="${1:-sweep_config_crb.yaml}"   # pass the config as the first sbatch argument
 RUN_GENERATOR=yes      # yes: generate Jones data first (now ~30x faster)
 RUN_PROCESSOR=yes      # yes: run the Monte-Carlo CRB sweep (checkpointed per fibre)
 RUN_ANALYSIS=yes       # yes: build heatmaps / summaries from the results

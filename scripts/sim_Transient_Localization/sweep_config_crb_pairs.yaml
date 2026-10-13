@@ -1,0 +1,63 @@
+# ---------------------------------------------------------------------------
+# CRB study - per-pair re-run for estimator comparison
+#   * reuses the SAME Jones data as the production run (jones_data_crb_full)
+#   * identical grids/channels as the production run
+#   * save_pairs: all  -> per-pair distances kept for offline estimator study
+# Run with RUN_GENERATOR=no in run_crb_hpc.sh.
+# ---------------------------------------------------------------------------
+run:
+  name: "crb_pairs"
+  n_jobs: -1
+
+fibre:
+  L_km: 0.5
+  L_F: 20.0
+  D_pmd: 2.5298e-15
+  lambda0_nm: 1550
+  seed: 0
+
+transient:
+  A_pulse: 0.0031
+
+time:
+  fs_factor: 20
+  t_end_factor: 160
+
+wdm:
+  generation: full_grid
+  full_grid_spacing_Hz: 50e9
+  f_min_Hz: 184e12
+  f_max_Hz: 196e12
+
+event:
+  distance_km: 500.0
+
+sweep:
+  bandwidths:
+    start_Hz: 200.0
+    stop_Hz: 2.0e6
+    num: 40
+  snrs_dB:
+    start: 15.0
+    stop: 100.0
+    num: 40
+  n_realisations: 100
+  n_fibres: 10
+
+noise:
+  base_seed: 0
+
+filter:
+  mode: "none"
+  order: 4
+  low_factor: 0.5
+  high_factor: 3.0
+
+analysis:
+  channel_counts: [4, 6, 8, 10, 12]
+  channel_selection: alternating
+
+output:
+  jones_dir: "jones_data_crb_full"
+  run_dir: "results_crb_full_pairs"
+  save_pairs: "all"

@@ -127,8 +127,34 @@ Key config knobs (`sweep_config_crb.yaml`):
 Non-SLURM (interactive) use: `bash run_crb_hpc.sh` still works; it is a normal
 shell script.
 
-## 7. Notes
+## 7. Estimator comparison (SNR-free fusion)
 
+All fusion rules below need **no SNR knowledge** — only the dispersion integral
+`D = |∫D dλ|` (known). They are compared on per-pair distances.
+
+| estimator | weights | notes |
+|---|---|---|
+| `single` | one pair (max `D`) | best single measurement, baseline |
+| `average` | equal | naive fusion |
+| `disp` | `w ∝ D²` | inverse-variance from dispersion (BLUE if CRB common) |
+| `robust` | `w ∝ D² · Tukey-bisquare` | smooth down-weighting of outliers (prior-study scheme) |
+
+Reference: `crb_gls` = covariance-aware (GLS) combined CRB.
+
+To run, keep **all per-pair distances** (they are discarded otherwise):
+
+```bash
+# 1) re-run only Stage 2 on the existing Jones data (no regeneration)
+sbatch run_crb_hpc.sh sweep_config_crb_pairs.yaml   # RUN_GENERATOR=no inside
+# 2) pull results_crb_full_pairs/ locally, then:
+python estimator_comparison.py results_crb_full_pairs
+```
+
+Outputs: `figs_estimators/F1..F6_*.png` and `estcomp_<n>ch.npz` (per-realisation
+estimates + RMSE/bias/std/MAE/success surfaces + GLS bound) so the figures can
+be rebuilt without recomputation.
+
+## 8. Notes
 * Noise seeds are **common across bandwidths and SNRs** (seed depends on fibre
   and realisation only), matching the existing pipeline. This smooths the
   heatmaps but produces correlated vertical stripes at low SNR. For the final
