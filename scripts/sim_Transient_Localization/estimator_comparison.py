@@ -206,19 +206,16 @@ def fig4_snr_vs_channels(res, counts, BW, SNRS, embed_dir, ib=None,
     fig.savefig(f); plt.close(fig); return f
 
 
-def fig5_distributions(d, pair_D, kbest, embed_dir, ib=None, is_=None,
-                       c=2.5, iqr_factor=1.5):
-    BW = d["BANDWIDTHS"]; SNRS = d["SNRS_dB"]; Ztrue = float(d["event_distance_km"])
+def fig5_distributions(f5, embed_dir, ib=None, is_=None):
+    BW = f5["BW"]; SNRS = f5["SNRS"]; Ztrue = f5["Ztrue"]; est = f5["est"]
     if ib is None:
         ib = len(BW) // 2
     if is_ is None:
         is_ = int(np.argmin(np.abs(SNRS - 35.0)))
-    Zp = d["pair_Z"][:, ib, is_, :, :]           # (nf, nreal, npairs)
-    D2 = pair_D ** 2
-    est = combine_estimators(Zp, D2, kbest, c=c, iqr_factor=iqr_factor)
     fig, ax = plt.subplots(figsize=(7.8, 5.4))
     for k in ESTS:
-        e = np.clip(np.sort(np.abs(np.ravel(est[k] - Ztrue))), 1e-6, None)
+        e = np.clip(np.sort(np.abs(np.ravel(est[k][:, ib, is_, :] - Ztrue))),
+                    1e-6, None)
         y = np.arange(1, len(e) + 1) / len(e)
         ax.loglog(e, y, color=COL[k], label=LBL[k])
     for frac, ls in [(0.01, ":"), (0.05, "--")]:
@@ -252,15 +249,32 @@ def fig6_gap(res, counts, BW, SNRS, embed_dir):
 
 
 # ---------------------------------- main ----------------------------------
-def main(run_dir):
-    files = sorted(glob.glob(os.path.join(run_dir, "crb_results_*ch.npz")))
-    if not files:
-        print("no results in", run_dir); return
-    embed_dir = os.path.join(run_dir, "figs_estimators")
-    os.makedirs(embed_dir, exist_ok=True)
+def _load_res(run_dir, replot):
+    """Return (res, counts, f5). replot=True loads estcomp_*.npz (fast);
+    replot=False recomputes everything from the per-pair crb_results_*.npz."""
+    res, counts, f5_all = {}, [], {}
 
-    counts = []
-    res = {}
+    if replot:
+        files = sorted(glob.glob(os.path.join(run_dir, "estcomp_*ch.npz")))
+        for f in files:
+            d = np.load(f, allow_pickle=True)
+            n = int(os.path.basename(f).rsplit("_", 1)[1].replace("ch.npz", ""))
+            counts.append(n)
+            res[n] = dict(
+                BW=d["BANDWIDTHS"], SNRS=d["SNRS_dB"],
+                rmse={k: d["rmse_" + k] for k in ESTS},
+                bias={k: d["bias_" + k] for k in ESTS},
+                std={k: d["std_" + k] for k in ESTS},
+                mae={k: d["mae_" + k] for k in ESTS},
+                success={k: d["success_" + k] for k in ESTS},
+                crb=np.nanmean(d["crb_gls"], axis=0))
+            f5_all[n] = dict(est={k: d["est_" + k] for k in ESTS},
+                             D=d["pair_D_abs"], kbest=int(d["kbest"]),
+                             Ztrue=float(d["event_distance_km"]),
+                             BW=d["BANDWIDTHS"], SNRS=d["SNRS_dB"])
+        return res, sorted(counts), (f5_all[max(counts)] if counts else None)
+
+    files = sorted(glob.glob(os.path.join(run_dir, "crb_results_*ch.npz")))
     for f in files:
         d = np.load(f, allow_pickle=True)
         if "pair_Z" not in d.files:
@@ -269,13 +283,12 @@ def main(run_dir):
         BW = d["BANDWIDTHS"]; SNRS = d["SNRS_dB"]
         Ztrue = float(d["event_distance_km"])
         D = d["D_abs"]; D2 = D ** 2; kbest = int(np.argmax(D))
-        tol = 0.01 * Ztrue          # 1% tolerance for success rate
+        tol = 0.01 * Ztrue
         print("count %2d: computing estimators + GLS bound..." % n)
 
         est = combine_estimators(d["pair_Z"], D2, kbest)
         surf = {k: metrics(v, Ztrue, tol) for k, v in est.items()}
         crb_gls = gls_bound(d)
-        crb_surf = np.nanmean(crb_gls, axis=0)
 
         res[n] = dict(BW=BW, SNRS=SNRS, toll=tol,
                       rmse={k: surf[k]["rmse"] for k in est},
@@ -283,9 +296,9 @@ def main(run_dir):
                       std={k: surf[k]["std"] for k in est},
                       mae={k: surf[k]["mae"] for k in est},
                       success={k: surf[k]["success"] for k in est},
-                      crb=crb_surf)
+                      crb=np.nanmean(crb_gls, axis=0))
+        f5_all[n] = dict(est=est, D=D, kbest=kbest, Ztrue=Ztrue, BW=BW, SNRS=SNRS)
 
-        # save derived data (float32 for the per-realisation estimates)
         np.savez_compressed(
             os.path.join(run_dir, "estcomp_%dch.npz" % n),
             BANDWIDTHS=BW, SNRS_dB=SNRS, event_distance_km=Ztrue, tol=tol,
@@ -298,24 +311,34 @@ def main(run_dir):
             **{("mae_" + k): surf[k]["mae"] for k in est},
             **{("success_" + k): surf[k]["success"] for k in est},
         )
-
         d.close()
 
     counts = sorted(counts)
+    return res, counts, (f5_all[max(counts)] if counts else None)
+
+
+def main(run_dir, replot=False):
+    embed_dir = os.path.join(run_dir, "figs_estimators")
+    os.makedirs(embed_dir, exist_ok=True)
+    res, counts, f5 = _load_res(run_dir, replot)
+    if not counts:
+        print("nothing to plot in", run_dir, "(--replot needs estcomp_*.npz)"); return
+    print(("replotting from estcomp files: " if replot else "computed counts: ")
+          + str(counts))
     BW = res[counts[0]]["BW"]; SNRS = res[counts[0]]["SNRS"]
     made = [fig1_money(res, counts, BW, SNRS, embed_dir),
             fig2_ratio_maps(res, counts, BW, SNRS, embed_dir),
             fig3_snr_saving(res, counts, BW, SNRS, embed_dir),
             fig4_snr_vs_channels(res, counts, BW, SNRS, embed_dir),
             fig6_gap(res, counts, BW, SNRS, embed_dir)]
-    df = np.load(os.path.join(run_dir, "crb_results_%dch.npz" % counts[-1]),
-                 allow_pickle=True)
-    made.append(fig5_distributions(df, df["D_abs"], int(np.argmax(df["D_abs"])),
-                                   embed_dir))
+    if f5 is not None:
+        made.append(fig5_distributions(f5, embed_dir))
     print("figures:")
     for m in made:
         print("  ", m)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "results_crb_full_pairs")
+    _args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    main(_args[0] if _args else "results_crb_full_pairs",
+         replot=("--replot" in sys.argv))
