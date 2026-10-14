@@ -67,6 +67,18 @@ PLOT_ESTS = ["average_pool", "disp_pool", "robust_pool"]   # filtered pool only
 MSS = {"average": 9, "disp": 14, "robust": 8,
        "average_pool": 9, "disp_pool": 14, "robust_pool": 8}
 POOL_ALPHA = 0.25   # keep pairs with D >= POOL_ALPHA * max(D)
+ALPHAS = [0.0, 0.05, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50, 0.70]
+
+
+def pool_pair_estimators(Zp, D2, alpha, c=2.5, iqr_factor=1.5):
+    """Naive and D^2-weighted estimates over the pool D >= alpha*max(D)."""
+    m = np.ones(D2.shape, dtype=bool) if alpha <= 0 else (D2 >= alpha * np.max(D2))
+    Zpp = Zp[..., m]
+    D2p = D2[m]
+    avg = np.nanmean(Zpp, axis=-1)
+    disp = (np.nansum(D2p * Zpp, axis=-1)
+            / np.nansum(np.broadcast_to(D2p, Zpp.shape), axis=-1))
+    return avg, disp
 
 TARGET_RMSE = 5.0          # km, used by the design figures (F3, F4)
 
@@ -346,6 +358,24 @@ def fig7_pool(res, counts, BW, SNRS, embed_dir, ib=None, target=TARGET_RMSE):
     fig.savefig(f); plt.close(fig); return f
 
 
+def fig8_alpha_sweep(res, counts, BW, SNRS, embed_dir, target=TARGET_RMSE):
+    fig, ax = plt.subplots(figsize=(9.4, 5.8))
+    cmap = plt.cm.viridis(np.linspace(0.0, 0.85, len(counts)))
+    mk = ["o", "s", "^", "v", "D"]
+    for ci, c in enumerate(counts):
+        if "alpha_saving" not in res[c]:
+            continue
+        s = np.nanmean(res[c]["alpha_saving"], axis=1)   # (n_alpha,)
+        ax.plot(ALPHAS, s, marker=mk[ci % len(mk)], color=cmap[ci], label="%d ch" % c)
+    ax.axhline(0, color="k", lw=0.8)
+    ax.set_xlabel(r"filter threshold $\alpha$   ($D \geq \alpha\,\max D$;  0 = all pairs)")
+    ax.set_ylabel(r"SNR saving of $D^2$ over averaging (dB)")
+    ax.set_title("Weighting benefit vs pair-selection threshold (RMSE = %.3g km)" % target)
+    ax.legend(title="channels")
+    f = os.path.join(embed_dir, "F8_alpha_sweep.png")
+    fig.savefig(f); plt.close(fig); return f
+
+
 # ---------------------------------- main ----------------------------------
 def _load_res(run_dir, replot):
     """Return (res, counts, f5). replot=True loads estcomp_*.npz (fast);
@@ -367,6 +397,8 @@ def _load_res(run_dir, replot):
                 mae={k: d["mae_" + k] for k in keys},
                 success={k: d["success_" + k] for k in keys},
                 crb=np.nanmean(d["crb_gls"], axis=0))
+            if "alpha_saving" in d.files:
+                res[n]["alpha_saving"] = d["alpha_saving"]
             est_keys = [k for k in (ESTS + POOL_ESTS) if ("est_" + k) in d.files]
             f5_all[n] = dict(est={k: d["est_" + k] for k in est_keys},
                              D=d["pair_D_abs"], kbest=int(d["kbest"]),
@@ -390,20 +422,33 @@ def _load_res(run_dir, replot):
         surf = {k: metrics(v, Ztrue, tol) for k, v in est.items()}
         crb_gls = gls_bound(d)
 
+        # ---- alpha sweep: residual weighting gain vs filter threshold ----
+        alpha_saving = np.full((len(ALPHAS), len(BW)), np.nan)
+        for ai, al in enumerate(ALPHAS):
+            avg_a, disp_a = pool_pair_estimators(d["pair_Z"], D2, al)
+            rmse_avg = metrics(avg_a, Ztrue, tol)["rmse"]
+            rmse_disp = metrics(disp_a, Ztrue, tol)["rmse"]
+            for ib in range(len(BW)):
+                alpha_saving[ai, ib] = (
+                    snr_for_target(rmse_avg[ib], SNRS, TARGET_RMSE)
+                    - snr_for_target(rmse_disp[ib], SNRS, TARGET_RMSE))
+
         res[n] = dict(BW=BW, SNRS=SNRS, toll=tol,
                       rmse={k: surf[k]["rmse"] for k in est},
                       bias={k: surf[k]["bias"] for k in est},
                       std={k: surf[k]["std"] for k in est},
                       mae={k: surf[k]["mae"] for k in est},
                       success={k: surf[k]["success"] for k in est},
-                      crb=np.nanmean(crb_gls, axis=0))
+                      crb=np.nanmean(crb_gls, axis=0),
+                      alpha_saving=alpha_saving)
         f5_all[n] = dict(est=est, D=D, kbest=kbest, Ztrue=Ztrue, BW=BW,
                          SNRS=SNRS, n=n)
 
         np.savez_compressed(
             os.path.join(run_dir, "estcomp_%dch.npz" % n),
             BANDWIDTHS=BW, SNRS_dB=SNRS, event_distance_km=Ztrue, tol=tol,
-            pair_D_abs=D, kbest=kbest,
+            pair_D_abs=D, kbest=kbest, alphas=np.array(ALPHAS),
+            alpha_saving=alpha_saving,
             **{("est_" + k): v.astype(np.float32) for k, v in est.items()},
             crb_gls=crb_gls,
             **{("rmse_" + k): surf[k]["rmse"] for k in est},
@@ -436,6 +481,8 @@ def main(run_dir, replot=False):
         made.append(fig5_distributions(f5, embed_dir))
     if "disp_pool" in res[counts[-1]]["rmse"]:
         made.append(fig7_pool(res, counts, BW, SNRS, embed_dir))
+    if "alpha_saving" in res[counts[-1]]:
+        made.append(fig8_alpha_sweep(res, counts, BW, SNRS, embed_dir))
     print("figures:")
     for m in made:
         print("  ", m)

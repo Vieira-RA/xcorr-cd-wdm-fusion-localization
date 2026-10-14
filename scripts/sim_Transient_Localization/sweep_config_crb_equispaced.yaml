@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# CRB study - equally-spaced channel grid (exploratory; may become definitive)
+#   * custom 30-channel equispaced master grid (every 8th ITU channel)
+#   * uniform channel selection -> equispaced subsets of {5,10,15} channels
+#   * dense sweep: 50 bandwidths x 50 SNRs, 10 fibres, 100 realisations
+#   * save_pairs: all (needed for the estimator / alpha-sweep study)
+# ---------------------------------------------------------------------------
+run:
+  name: "crb_equispaced"
+  n_jobs: -1
+
+fibre:
+  L_km: 0.5
+  L_F: 20.0
+  D_pmd: 2.5298e-15
+  lambda0_nm: 1550
+  seed: 0
+
+transient:
+  A_pulse: 0.0031
+
+time:
+  fs_factor: 20
+  t_end_factor: 160
+
+wdm:
+  generation: custom          # custom uniformly-spaced grid
+  n_channels: 30
+  channel_grid: uniform
+  f_min_Hz: 184e12
+  f_max_Hz: 196e12
+
+event:
+  distance_km: 500.0
+
+sweep:
+  bandwidths:
+    start_Hz: 200.0
+    stop_Hz: 2.0e6
+    num: 50
+  snrs_dB:
+    start: 15.0
+    stop: 100.0
+    num: 50
+  n_realisations: 100
+  n_fibres: 10
+
+noise:
+  base_seed: 0
+
+filter:
+  mode: "none"
+  order: 4
+  low_factor: 0.5
+  high_factor: 3.0
+
+analysis:
+  channel_counts: [5, 10, 15]
+  channel_selection: uniform
+
+output:
+  jones_dir: "jones_data_crb_equispaced"
+  run_dir: "results_crb_equispaced"
+  save_pairs: "all"

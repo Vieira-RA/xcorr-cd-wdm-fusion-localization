@@ -106,15 +106,19 @@ def main(config_path):
     fs_factor = float(cfg["time"]["fs_factor"])
     t_end_factor = float(cfg["time"]["t_end_factor"])
 
-    # ---- WDM full grid ----
+    # ---- WDM grid (full ITU grid or a custom uniformly-spaced grid) ----
     wdm = cfg["wdm"]
     f_min = float(wdm["f_min_Hz"])
     f_max = float(wdm["f_max_Hz"])
-    spacing = float(wdm.get("full_grid_spacing_Hz", 50e9))
-    freq_channels = np.arange(f_min, f_max + spacing / 2, spacing)
-    if freq_channels[-1] < f_max:
-        freq_channels = np.append(freq_channels, f_max)
-    freq_channels = np.sort(freq_channels)
+    if str(wdm.get("generation", "full_grid")).lower() == "custom":
+        n_ch = int(wdm["n_channels"])
+        freq_channels = np.linspace(f_min, f_max, n_ch)
+    else:
+        spacing = float(wdm.get("full_grid_spacing_Hz", 50e9))
+        freq_channels = np.arange(f_min, f_max + spacing / 2, spacing)
+        if freq_channels[-1] < f_max:
+            freq_channels = np.append(freq_channels, f_max)
+        freq_channels = np.sort(freq_channels)
     wavelengths_nm = frequency_to_wavelength(freq_channels)
     N_full = len(freq_channels)
 
