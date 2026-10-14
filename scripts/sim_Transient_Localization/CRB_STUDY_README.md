@@ -185,7 +185,35 @@ Outputs: `figs_estimators/F1..F6_*.png` (publication style, 300 dpi) and
 
 ## 9. Paper
 
-`../../paper/` holds the conference draft:
-* `CRB_transient_localization_optica.tex` — Optica/OFC style (`opticameet3`),
-  with an equation-reference appendix page.
-* `README.md` — build notes and figure swap-in instructions.
+`paper/` holds the conference draft.
+
+| file | role |
+|---|---|
+| `paper/CRB_transient_localization_optica.tex` | **primary**, Optica/OFC style (`opticameet3.sty`), 3 figures + an equation-reference appendix page |
+| `paper/crb_transient_localization_conf.tex` | generic `article` version (kept for reference) |
+| `paper/README.md` | build steps (needs `opticameet3.sty`) and figure swap-in commands |
+
+**Figure provenance** — which script produces each panel:
+
+| paper figure | source file | produced by |
+|---|---|---|
+| Fig. 1 (concept, TikZ) | — (drawn in the `.tex`) | — |
+| Fig. 2 (RMSE vs SNR) | `figs_estimators/F1_rmse_vs_snr.png` | `estimator_comparison.py` |
+| Fig. 3a (iso-precision) | `figs_estimators/F3_isoprecision.png` | `estimator_comparison.py` |
+| Fig. 3b (dB gain vs channels) | `figs_estimators/F4_db_gain_vs_channels.png` | `estimator_comparison.py` |
+| supplementary (improvement maps, error violin) | `figs_estimators/F2_*.png`, `F5_*.png` | `estimator_comparison.py` |
+| supplementary (std/bias heatmaps, GLS contours) | `fig_<n>ch_std_crb.png`, `fig_<n>ch_bias.png` | `analyse_crb_sweep.py` |
+
+Regenerate the paper figures:
+
+```bash
+# on the per-pair results (all fusion rules + GLS reference)
+python estimator_comparison.py results_crb_full_pairs
+# then copy into the paper folder
+cp results_crb_full_pairs/figs_estimators/F1_rmse_vs_snr.png         ../../paper/figures/
+cp results_crb_full_pairs/figs_estimators/F3_isoprecision.png        ../../paper/figures/
+cp results_crb_full_pairs/figs_estimators/F4_db_gain_vs_channels.png ../../paper/figures/
+```
+
+The numbers quoted in the draft (RMSE/CRB ≈ 1.0–1.1; improvement factors;
+channel dB gain) are read from `estcomp_<n>ch.npz`.
