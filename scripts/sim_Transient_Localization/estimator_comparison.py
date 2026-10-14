@@ -237,8 +237,8 @@ def fig5_distributions(f5, embed_dir, ib=None, is_=None):
                 va="center", ha="left", fontsize=12, color="0.3")
     ax.set_xlabel("|error| (km)")
     ax.set_ylabel(r"fraction of estimates $\leq x$")
-    ax.set_title("ECDF of error (B = %.3g kHz, SNR = %.0f dB)"
-                 % (BW[ib] / 1e3, SNRS[is_]))
+    ax.set_title("%d ch | ECDF of error (B = %.3g kHz, SNR = %.0f dB)"
+                 % (f5["n"], BW[ib] / 1e3, SNRS[is_]))
     ax.legend(loc="lower right")
     f = os.path.join(embed_dir, "F5_error_distributions.png")
     fig.savefig(f); plt.close(fig); return f
@@ -257,9 +257,10 @@ def fig6_gap(res, counts, BW, SNRS, embed_dir):
                          markerfacecolor=mfc, label=LBL[est])
     axes[0].axhline(1.0, color="k", ls="--", lw=1.4, label=r"CRB ($=10^0$)")
     axes[0].set_ylabel("std / CRB")
-    axes[0].set_title("Variance efficiency (B = %.3g kHz)" % (BW[ib] / 1e3))
+    axes[0].set_title("Variance efficiency (%d ch, B = %.3g kHz)"
+                      % (key, BW[ib] / 1e3))
     axes[1].set_ylabel("|bias| (km)")
-    axes[1].set_title("Bias")
+    axes[1].set_title("Bias (%d ch)" % key)
     for a in axes:
         a.set_xlabel("SNR (dB)")
     axes[0].legend()
@@ -290,7 +291,7 @@ def _load_res(run_dir, replot):
             f5_all[n] = dict(est={k: d["est_" + k] for k in ESTS},
                              D=d["pair_D_abs"], kbest=int(d["kbest"]),
                              Ztrue=float(d["event_distance_km"]),
-                             BW=d["BANDWIDTHS"], SNRS=d["SNRS_dB"])
+                             BW=d["BANDWIDTHS"], SNRS=d["SNRS_dB"], n=n)
         return res, sorted(counts), (f5_all[max(counts)] if counts else None)
 
     files = sorted(glob.glob(os.path.join(run_dir, "crb_results_*ch.npz")))
@@ -316,7 +317,8 @@ def _load_res(run_dir, replot):
                       mae={k: surf[k]["mae"] for k in est},
                       success={k: surf[k]["success"] for k in est},
                       crb=np.nanmean(crb_gls, axis=0))
-        f5_all[n] = dict(est=est, D=D, kbest=kbest, Ztrue=Ztrue, BW=BW, SNRS=SNRS)
+        f5_all[n] = dict(est=est, D=D, kbest=kbest, Ztrue=Ztrue, BW=BW,
+                         SNRS=SNRS, n=n)
 
         np.savez_compressed(
             os.path.join(run_dir, "estcomp_%dch.npz" % n),
