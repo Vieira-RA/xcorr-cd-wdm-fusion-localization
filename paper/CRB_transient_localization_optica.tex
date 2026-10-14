@@ -28,8 +28,8 @@
 \newcommand{\med}{\mathrm{med}}
 \newcommand{\Var}{\mathrm{Var}}
 
-\title{Why Dispersion-Weighted Fusion Reaches the Cram\'er--Rao Bound in
-Multi-Channel Transient Localisation}
+\title{Pair Selection Reaches the Cram\'er--Rao Bound in Multi-Channel
+Transient Localisation over WDM Fibres}
 
 \author{Author One,\authormark{1} Author Two,\authormark{1,*} and Author Three\authormark{2}}
 
@@ -39,10 +39,10 @@ Multi-Channel Transient Localisation}
 \email{\authormark{*}author@institution.edu}
 
 \begin{abstract}
-A mechanical perturbation modulates the state of polarisation along a fibre;
-chromatic dispersion delays its signature differently across WDM channels. We
-derive the Cram\'er--Rao bound, show dispersion-weighted fusion attains it while
-naive averaging does not, and give signal-to-noise-ratio-free estimators.
+A perturbation modulates the polarisation along a WDM fibre; chromatic
+dispersion delays its signature across channels. We derive the
+Cram\'er--Rao bound and show that selecting well-separated channel pairs
+--- not fusing all pairs --- attains it.
 \end{abstract}
 
 \section{Introduction}
@@ -56,13 +56,17 @@ distance, so multi-channel time-delay estimation directly yields the range
 $Z$~\cite{sadler2003survey}. With $\sim\!10$ channels, hundreds of channel pairs
 are available, which naively suggests that fusing them must improve accuracy.
 
-We show, at proof-of-concept level, that this intuition is wrong unless the
-fusion is \emph{dispersion-aware}. Our contributions are: (i)~the effective-SNR
-Cram\'er--Rao bound (CRB) for CD-based transient localisation, validated against
-Monte Carlo; (ii)~the counter-intuitive result that equal-weight averaging is
-\emph{beaten by a single well-chosen pair}, while dispersion-weighted fusion
-\emph{attains} the bound; and (iii)~signal-to-noise-ratio (SNR)-free estimators
-plus the scaling laws that turn this into a design rule.
+We show, at proof-of-concept level, that the essential step is \emph{pair
+selection}. Naive fusion over \emph{all} channel pairs is dominated by
+uninformative small-separation pairs; restricting to \emph{well-separated}
+pairs attains the bound, and dispersion weighting is simply the soft-filter
+equivalent. Our contributions are: (i)~the effective-SNR Cram\'er--Rao bound
+(CRB) for CD-based transient localisation, validated against Monte Carlo;
+(ii)~the result that equal-weight fusion over all pairs falls far from the bound
+(and can be beaten by a single well-chosen pair), whereas selecting
+well-separated pairs --- combined equally or by dispersion weighting --- attains
+it; and (iii)~signal-to-noise-ratio (SNR)-free estimators plus the scaling laws
+that turn this into a design rule.
 
 \section{System Model and Cram\'er--Rao Bound}
 A fixed input state of polarisation (SOP) propagates through a fibre with
@@ -149,55 +153,64 @@ cross-correlation.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.78\linewidth]{F1_rmse_vs_snr.png}
-\caption{RMSE vs SNR at three bandwidths ($12$ channels). Ranking:
-worst pair $\gg$ pure average $>$ best pair $>$ dispersion-weighted
-$\approx$ robust $\approx$ CRB. Equal-weight averaging is \emph{worse than one
-well-chosen pair}; dispersion weighting attains the bound. Markers and line
-styles distinguish the curves for accessibility.}
+\includegraphics[width=0.9\linewidth]{F1_rmse_vs_snr.png}
+\caption{RMSE vs SNR at three bandwidths ($12$ channels), fusing \emph{all}
+channel pairs (no selection). Equal-weight averaging (circles) is far above the
+bound; dispersion-weighted (squares) and robust (diamonds) attain the CRB
+(dashed, ratio $\approx\!1.0$--$1.1$).}
 \label{fig:money}
 \end{figure}
 
-\textbf{Fusion reaches the CRB; averaging does not} (Fig.~\ref{fig:money}).
-At high SNR the dispersion-weighted and robust rules lie on the CRB
-(RMSE/CRB$\,\approx 1.0$--$1.1$), the single best pair remains
-$1$--$10\times$ and pure averaging $10$--$10^{3}\times$ above it, and the worst
-pair is up to $\sim\!10^{4}\times$ worse than the fused estimate. The reason is
-Eq.~(2): since $\sigma_{Z,ij}\!\propto\!1/D_{ij}$, low-separation pairs carry
-almost no information, yet equal weighting lets them dominate.
+\textbf{Naive all-pairs fusion fails} (Fig.~\ref{fig:money}). At high SNR the dispersion-weighted and
+robust rules lie on the CRB ($\mathrm{RMSE}/\mathrm{CRB}\approx1.0$--$1.1$),
+whereas equal-weight averaging over \emph{all} pairs remains
+$10$--$10^{3}\times$ above it. The reason follows from Eq.~(2):
+$\sigma_{Z,ij}\!\propto\!1/D_{ij}$, so low-separation pairs carry almost no
+information, yet equal weighting lets them dominate. The fix is pair selection.
 
 \begin{figure}[t]
 \centering
-\begin{minipage}{0.49\linewidth}\centering
-\includegraphics[width=\linewidth]{F3_isoprecision.png}
-\end{minipage}\hfill
-\begin{minipage}{0.49\linewidth}\centering
-\includegraphics[width=\linewidth]{F4_db_gain_vs_channels.png}
-\end{minipage}
-\caption{Design curves. Left: SNR saved by dispersion-weighted fusion over pure
-averaging versus perturbation bandwidth (mean annotated in the legend). Right:
-SNR required to reach RMSE$\,=5\,$km versus channel count, for pure averaging,
-$D^2$-weighted, robust, and the CRB (lower is better). Weighting buys $\sim$ tens
-of dB and the benefit grows with the number of channels.}
-\label{fig:scaling}
+\includegraphics[width=\linewidth]{F7_pool_effect.png}
+\caption{Pair selection is the essential step. Left: RMSE vs SNR ($12$ ch) for
+equal-weight averaging over \emph{all} pairs (circles) and over a
+\emph{filtered pool} with $D\!\ge\!0.25\max D$ (squares); on the filtered pool,
+equal averaging, $D^2$-weighting and robust all coincide on the CRB. Right:
+residual SNR saving of weighting over averaging --- $\sim\!30$\,dB on all pairs
+but $\approx 0$ after filtering. Dispersion weighting is the soft-filter
+equivalent of an explicit threshold.}
+\label{fig:pool}
 \end{figure}
 
-\textbf{Scaling laws} (Fig.~\ref{fig:scaling}). (i)~At high SNR the RMSE scales
-as $1/(\sqrt{\SNR}\,B)$, recovering the CRB law Eq.~(2): perturbation
-\emph{bandwidth is as fundamental as SNR}. (ii)~Adding channels increases the
-fused information through $\sum D_{ij}^2$: the SNR required to reach a target
-drops, and the gap to pure averaging grows with channel count. (iii)~Averaging $N$ independent fibres lowers the RMSE
-as $1/\sqrt{N}$, independent of the fusion rule. (iv)~The robust rule departs
-from the CRB only in the threshold region, where it reduces both RMSE and
-heavy-tail bias.
+\textbf{Pair selection, not weighting, is what matters} (Fig.~\ref{fig:pool}).
+Restricting the pool to well-separated pairs ($D\ge 0.25\max D$) removes the
+uninformative pairs and the naive average drops onto the CRB; the residual
+benefit of dispersion weighting is then $\approx 0$\,dB. In other words,
+weighting and hard filtering are two implementations of the same idea ---
+discard low-separation pairs. Because the retained pairs have similar
+precision, \emph{any} sensible combination reaches the bound, which makes the
+proposed scheme calibration-free and robust to the exact weighting.
+
+\textbf{Design rules.} (i)~At high SNR the RMSE scales as $1/(\sqrt{\SNR}\,B)$
+(Eq.~(2)), so the perturbation \emph{bandwidth is as fundamental as SNR}.
+(ii)~The SNR penalty of fusing \emph{all} pairs, relative to selecting a
+well-separated pool, is $\sim$28--35\,dB, and is largest for few channels.
+(iii)~The SNR required to reach RMSE$\,=5\,$km falls monotonically with the
+number of channels ($\sim$62--67\,dB for the selected pool versus
+$\sim$92--100\,dB for all-pairs averaging). (iv)~Averaging $N$ independent fibres
+lowers the RMSE as $1/\sqrt{N}$, independently of the fusion rule. (v)~The robust
+rule departs from the CRB only in the threshold region, reducing heavy-tail
+error. These curves are provided as supplementary material.
 
 \section{Conclusion}
 We derived and validated the effective-SNR CRB for CD-based transient
-localisation and showed that dispersion-aware multi-channel fusion reaches it,
-while naive averaging can be worse than a single optimised pair. The winning
-estimator needs no SNR knowledge, so it is directly deployable, and because the
+localisation and showed that the essential step is \emph{pair selection}: fusing
+\emph{all} channel pairs is dominated by uninformative small-separation pairs,
+whereas restricting to well-separated pairs attains the bound regardless of the
+combining rule --- dispersion weighting being the soft-filter equivalent. The
+scheme needs no SNR knowledge, so it is directly deployable, and because the
 bound scales as $1/(\sqrt{\SNR}\,B)$, slow perturbations are the hard case.
-Future work: experimental validation and covariance-aware (GLS) fusion.
+Future work: experimental validation, covariance-aware fusion, and optimisation
+of the channel-selection scheme.
 
 \begin{thebibliography}{9}
 \bibitem{taylor1993das} H.~F. Taylor and C.~E. Lee, ``Apparatus and method for
