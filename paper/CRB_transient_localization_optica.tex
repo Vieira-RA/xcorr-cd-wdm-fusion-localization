@@ -97,17 +97,29 @@ throughout.
 \begin{figure}[t]
 \centering
 \begin{tikzpicture}[font=\footnotesize,>=Latex,node distance=4mm]
+% ---- panel (a): schematic ----
 \node[draw,rounded corners,minimum height=5mm,minimum width=9mm] (tx){TX};
-\node[draw,rounded corners,minimum height=5mm,minimum width=30mm,right=6mm of tx] (link){fibre (PMD+CD)};
-\node[right=6mm of link,star,star points=6,star point height=1.8mm,draw,fill=red!60,inner sep=0pt,minimum size=3.4mm] (ev){};
-\node[below=0.5mm of ev,text=red!70!black] {perturbation at $Z$};
-\node[draw,rounded corners,minimum height=5mm,minimum width=10mm,right=6mm of ev] (rx){WDM};
-\node[draw,rounded corners,minimum height=5mm,minimum width=10mm,below=4mm of rx] (dsp){fusion};
+\node[draw,rounded corners,minimum height=5mm,minimum width=24mm,right=5mm of tx] (link){fibre (PMD+CD)};
+\node[right=5mm of link,star,star points=6,star point height=1.8mm,draw,fill=red!60,inner sep=0pt,minimum size=3.2mm] (ev){};
+\node[below=0.4mm of ev,text=red!70!black,font=\scriptsize] {transient at $Z$};
+\node[draw,rounded corners,minimum height=5mm,minimum width=10mm,right=5mm of ev] (rx){WDM};
+\node[draw,rounded corners,minimum height=5mm,minimum width=10mm,below=3mm of rx] (dsp){fusion};
 \draw[->] (tx)--(link); \draw[->] (link)--(ev); \draw[->] (ev)--(rx); \draw[->] (rx)--(dsp);
-\node[right=1mm of rx,align=left] {$\lambda_1\!:\!\tau_1$\\$\lambda_2\!:\!\tau_2$\\$\vdots$};
+\node[right=1mm of rx,align=left,font=\scriptsize]{$\lambda_1\!:\!\tau_1$\\$\lambda_2\!:\!\tau_2$\\$\vdots$};
+% ---- panel (b): same transient, shifted per carrier by CD ----
+\begin{scope}[yshift=-2.35cm]
+\draw[->] (0,0)--(6.6,0) node[right,font=\scriptsize]{$t$};
+\draw[->] (0,0)--(0,1.35) node[above,font=\scriptsize]{SOP};
+\draw[thick,blue,domain=0.2:6.4,samples=60] plot (\x,{exp(-(\x-2.4)^2/0.5)});
+\draw[thick,red,dashed,domain=0.2:6.4,samples=60] plot (\x,{exp(-(\x-3.7)^2/0.5)});
+\draw[<->] (2.4,1.12)--(3.7,1.12) node[midway,above,font=\scriptsize]{$\Delta\tau_{ij}=Z\!\int\! D\,d\lambda$};
+\node[blue,font=\scriptsize] at (1.5,0.12){$\lambda_i$};
+\node[red,font=\scriptsize] at (4.75,0.12){$\lambda_j$};
+\node[font=\scriptsize,align=left] at (6.05,0.95){same\\transient};
+\end{scope}
 \end{tikzpicture}
-\caption{A single transient imprints wavelength-dependent delays
-$\tau_i\!\propto\!Z\!\int\!D\,d\lambda$; fusion across channel pairs recovers $Z$.}
+\caption{(a) A transient at distance $Z$ modulates the local birefringence; the received SOP is demultiplexed per carrier. (b) Chromatic dispersion makes the \emph{same} transient appear time-shifted across carriers by
+$\tau_{ij}=Z\!\int\!D\,d\lambda$ --- this inter-channel delay encodes $Z$.}
 \label{fig:concept}
 \end{figure}
 
@@ -162,18 +174,19 @@ almost no information, yet equal weighting lets them dominate.
 \begin{minipage}{0.49\linewidth}\centering
 \includegraphics[width=\linewidth]{F4_db_gain_vs_channels.png}
 \end{minipage}
-\caption{Design curves. Left: SNR required for RMSE$\,=1\,$km versus perturbation
-bandwidth (dashed = CRB). Right: SNR saved by dispersion-weighted fusion over
-the baselines versus channel count --- the fusion gain grows with the number of
-channels.}
+\caption{Design curves. Left: SNR saved by dispersion-weighted fusion over pure
+averaging versus perturbation bandwidth (mean annotated in the legend). Right:
+SNR required to reach RMSE$\,=5\,$km versus channel count, for pure averaging,
+$D^2$-weighted, robust, and the CRB (lower is better). Weighting buys $\sim$ tens
+of dB and the benefit grows with the number of channels.}
 \label{fig:scaling}
 \end{figure}
 
 \textbf{Scaling laws} (Fig.~\ref{fig:scaling}). (i)~At high SNR the RMSE scales
 as $1/(\sqrt{\SNR}\,B)$, recovering the CRB law Eq.~(2): perturbation
 \emph{bandwidth is as fundamental as SNR}. (ii)~Adding channels increases the
-fused information through $\sum D_{ij}^2$, so the SNR saving over a single pair
-grows with channel count. (iii)~Averaging $N$ independent fibres lowers the RMSE
+fused information through $\sum D_{ij}^2$: the SNR required to reach a target
+drops, and the gap to pure averaging grows with channel count. (iii)~Averaging $N$ independent fibres lowers the RMSE
 as $1/\sqrt{N}$, independent of the fusion rule. (iv)~The robust rule departs
 from the CRB only in the threshold region, where it reduces both RMSE and
 heavy-tail bias.

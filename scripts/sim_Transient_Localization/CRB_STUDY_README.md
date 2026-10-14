@@ -199,8 +199,8 @@ Outputs: `figs_estimators/F1..F6_*.png` (publication style, 300 dpi) and
 |---|---|---|
 | Fig. 1 (concept, TikZ) | — (drawn in the `.tex`) | — |
 | Fig. 2 (RMSE vs SNR) | `figs_estimators/F1_rmse_vs_snr.png` | `estimator_comparison.py` |
-| Fig. 3a (iso-precision) | `figs_estimators/F3_isoprecision.png` | `estimator_comparison.py` |
-| Fig. 3b (dB gain vs channels) | `figs_estimators/F4_db_gain_vs_channels.png` | `estimator_comparison.py` |
+| Fig. 3a (SNR saving vs bandwidth) | `figs_estimators/F3_isoprecision.png` | `estimator_comparison.py` |
+| Fig. 3b (SNR for RMSE target vs channels) | `figs_estimators/F4_db_gain_vs_channels.png` | `estimator_comparison.py` |
 | supplementary (improvement maps, error violin) | `figs_estimators/F2_*.png`, `F5_*.png` | `estimator_comparison.py` |
 | supplementary (std/bias heatmaps, GLS contours) | `fig_<n>ch_std_crb.png`, `fig_<n>ch_bias.png` | `analyse_crb_sweep.py` |
 
