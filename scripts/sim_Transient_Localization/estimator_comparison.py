@@ -49,16 +49,23 @@ plt.rcParams.update({
     "lines.markersize": 8,
 })
 COL = {"single_worst": "#7F7F7F", "single": "#D55E00", "average": "#0072B2",
-       "disp": "#009E73", "robust": "#CC79A7"}
+       "disp": "#009E73", "robust": "#CC79A7",
+       "average_pool": "#0072B2", "disp_pool": "#009E73",
+       "robust_pool": "#CC79A7"}
 LBL = {"single_worst": "single worst pair", "single": "single best pair",
        "average": "pure average", "disp": r"$D^2$-weighted",
-       "robust": r"$D^2$ + bisquare (robust)"}
+       "robust": r"$D^2$ + bisquare (robust)",
+       "average_pool": "average (filtered pool)",
+       "disp_pool": r"$D^2$-weighted (filtered pool)",
+       "robust_pool": r"robust (filtered pool)"}
 MARK = {"single_worst": "x", "single": "v", "average": "o", "disp": "s",
-        "robust": "D"}
+        "robust": "D",
+        "average_pool": "o", "disp_pool": "s", "robust_pool": "D"}
 ESTS = ["single_worst", "single", "average", "disp", "robust"]
 POOL_ESTS = ["average_pool", "disp_pool", "robust_pool"]
-PLOT_ESTS = ["average", "disp", "robust"]      # curves shown in figures
-MSS = {"average": 9, "disp": 14, "robust": 8}  # per-estimator marker sizes
+PLOT_ESTS = ["average_pool", "disp_pool", "robust_pool"]   # filtered pool only
+MSS = {"average": 9, "disp": 14, "robust": 8,
+       "average_pool": 9, "disp_pool": 14, "robust_pool": 8}
 POOL_ALPHA = 0.25   # keep pairs with D >= POOL_ALPHA * max(D)
 
 TARGET_RMSE = 5.0          # km, used by the design figures (F3, F4)
@@ -174,7 +181,7 @@ def fig1_money(res, counts, BW, SNRS, embed_dir):
 
 def fig2_ratio_maps(res, counts, BW, SNRS, embed_dir):
     key = counts[-1]; r = res[key]
-    dB = 20.0 * np.log10(r["rmse"]["average"] / r["rmse"]["robust"])
+    dB = 20.0 * np.log10(r["rmse"]["average_pool"] / r["rmse"]["robust_pool"])
     fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(15.5, 5.2),
                                    gridspec_kw={"width_ratios": [1.3, 1]})
     X, Y = np.meshgrid(SNRS, BW)
@@ -203,9 +210,9 @@ def fig3_snr_saving(res, counts, BW, SNRS, embed_dir, target=TARGET_RMSE):
     fig, ax = plt.subplots(figsize=(10.5, 6.4))
     for ci, nch in enumerate(use):
         r = res[nch]
-        navg = np.array([snr_for_target(r["rmse"]["average"][ib], SNRS, target)
+        navg = np.array([snr_for_target(r["rmse"]["average_pool"][ib], SNRS, target)
                          for ib in range(len(BW))])
-        for est, ls in [("disp", "--"), ("robust", "-")]:
+        for est, ls in [("disp_pool", "--"), ("robust_pool", "-")]:
             nn = np.array([snr_for_target(r["rmse"][est][ib], SNRS, target)
                            for ib in range(len(BW))])
             d = navg - nn
@@ -218,8 +225,8 @@ def fig3_snr_saving(res, counts, BW, SNRS, embed_dir, target=TARGET_RMSE):
     ax.set_title("SNR saving at RMSE = %.3g km" % target)
     ch_h = [Line2D([], [], color=cmap[i], marker=mk[i % len(mk)], ls="none",
                    ms=11, label="%d ch" % use[i]) for i in range(len(use))]
-    est_h = [Line2D([], [], color="0.3", ls="--", label=LBL["disp"]),
-             Line2D([], [], color="0.3", ls="-", label=LBL["robust"])]
+    est_h = [Line2D([], [], color="0.3", ls="--", label=LBL["disp_pool"]),
+             Line2D([], [], color="0.3", ls="-", label=LBL["robust_pool"])]
     l1 = ax.legend(handles=ch_h, title="channels", loc="lower left",
                    ncol=len(use), fontsize=12, title_fontsize=12)
     ax.add_artist(l1)
@@ -360,7 +367,8 @@ def _load_res(run_dir, replot):
                 mae={k: d["mae_" + k] for k in keys},
                 success={k: d["success_" + k] for k in keys},
                 crb=np.nanmean(d["crb_gls"], axis=0))
-            f5_all[n] = dict(est={k: d["est_" + k] for k in ESTS},
+            est_keys = [k for k in (ESTS + POOL_ESTS) if ("est_" + k) in d.files]
+            f5_all[n] = dict(est={k: d["est_" + k] for k in est_keys},
                              D=d["pair_D_abs"], kbest=int(d["kbest"]),
                              Ztrue=float(d["event_distance_km"]),
                              BW=d["BANDWIDTHS"], SNRS=d["SNRS_dB"], n=n)

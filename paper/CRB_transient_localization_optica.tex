@@ -154,41 +154,39 @@ cross-correlation.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.9\linewidth]{F1_rmse_vs_snr.png}
-\caption{RMSE vs SNR at three bandwidths ($12$ channels), fusing \emph{all}
-channel pairs (no selection). Equal-weight averaging (circles) is far above the
-bound; dispersion-weighted (squares) and robust (diamonds) attain the CRB
-(dashed, ratio $\approx\!1.0$--$1.1$).}
+\caption{RMSE vs SNR at three bandwidths ($12$ channels) using a \emph{filtered}
+pair pool ($D\!\ge\!0.25\max D$). Equal-weight averaging (circles),
+$D^2$-weighting (squares) and robust (diamonds) coincide on the CRB (dashed,
+ratio $\approx\!1.0$--$1.1$): once uninformative pairs are removed the combiner
+is irrelevant.}
 \label{fig:money}
 \end{figure}
 
-\textbf{Naive all-pairs fusion fails} (Fig.~\ref{fig:money}). At high SNR the dispersion-weighted and
-robust rules lie on the CRB ($\mathrm{RMSE}/\mathrm{CRB}\approx1.0$--$1.1$),
-whereas equal-weight averaging over \emph{all} pairs remains
-$10$--$10^{3}\times$ above it. The reason follows from Eq.~(2):
-$\sigma_{Z,ij}\!\propto\!1/D_{ij}$, so low-separation pairs carry almost no
-information, yet equal weighting lets them dominate. The fix is pair selection.
+\textbf{Pair selection attains the CRB} (Fig.~\ref{fig:money}). On the filtered
+pool the three combiners are indistinguishable and all lie on the CRB. The
+essential step is therefore the \emph{selection} of pairs, not the weighting.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{F7_pool_effect.png}
-\caption{Pair selection is the essential step. Left: RMSE vs SNR ($12$ ch) for
-equal-weight averaging over \emph{all} pairs (circles) and over a
-\emph{filtered pool} with $D\!\ge\!0.25\max D$ (squares); on the filtered pool,
-equal averaging, $D^2$-weighting and robust all coincide on the CRB. Right:
-residual SNR saving of weighting over averaging --- $\sim\!30$\,dB on all pairs
-but $\approx 0$ after filtering. Dispersion weighting is the soft-filter
-equivalent of an explicit threshold.}
+\caption{Why selection matters. Left: RMSE vs SNR ($12$ ch) for equal-weight
+averaging over \emph{all} pairs (circles) versus a \emph{filtered pool}
+($D\!\ge\!0.25\max D$, squares); on the pool, equal averaging, $D^2$ and robust
+all coincide on the CRB. Right: the SNR penalty of fusing all pairs is
+$\sim\!30$\,dB and vanishes ($\approx 0$) after filtering --- dispersion
+weighting is the soft-filter equivalent of the threshold.}
 \label{fig:pool}
 \end{figure}
 
-\textbf{Pair selection, not weighting, is what matters} (Fig.~\ref{fig:pool}).
-Restricting the pool to well-separated pairs ($D\ge 0.25\max D$) removes the
-uninformative pairs and the naive average drops onto the CRB; the residual
-benefit of dispersion weighting is then $\approx 0$\,dB. In other words,
-weighting and hard filtering are two implementations of the same idea ---
-discard low-separation pairs. Because the retained pairs have similar
-precision, \emph{any} sensible combination reaches the bound, which makes the
-proposed scheme calibration-free and robust to the exact weighting.
+\textbf{Uninformative pairs destroy naive fusion} (Fig.~\ref{fig:pool}). Fusing
+\emph{all} pairs, the equal average stays $10$--$10^{3}\times$ above the CRB:
+from Eq.~(2), $\sigma_{Z,ij}\!\propto\!1/D_{ij}$, so low-separation pairs carry
+almost no information yet dominate an equal-weight mean. Restricting to
+well-separated pairs removes them and the average drops onto the CRB; the
+residual benefit of weighting is then $\approx 0$\,dB. Weighting and hard
+filtering are thus two implementations of the same idea --- discard
+low-separation pairs --- which makes the recipe calibration-free and robust to
+the exact combining rule.
 
 \textbf{Design rules.} (i)~At high SNR the RMSE scales as $1/(\sqrt{\SNR}\,B)$
 (Eq.~(2)), so the perturbation \emph{bandwidth is as fundamental as SNR}.
