@@ -56,8 +56,10 @@ LBL = {"single_worst": "single worst pair", "single": "single best pair",
 MARK = {"single_worst": "x", "single": "v", "average": "o", "disp": "s",
         "robust": "D"}
 ESTS = ["single_worst", "single", "average", "disp", "robust"]
+POOL_ESTS = ["average_pool", "disp_pool", "robust_pool"]
 PLOT_ESTS = ["average", "disp", "robust"]      # curves shown in figures
 MSS = {"average": 9, "disp": 14, "robust": 8}  # per-estimator marker sizes
+POOL_ALPHA = 0.25   # keep pairs with D >= POOL_ALPHA * max(D)
 
 TARGET_RMSE = 5.0          # km, used by the design figures (F3, F4)
 
@@ -100,6 +102,25 @@ def combine_estimators(Zp, D2, kbest, kworst=None, c=2.5, iqr_factor=1.5):
     num = np.nansum(w * Zp, axis=-1)
     den = np.nansum(w, axis=-1)
     out["robust"] = np.where(den > 0, num / den, np.nan)
+
+    # ---- pool-filtered variants: drop uninformative pairs (D >= a*max D) ----
+    m = D2 >= (POOL_ALPHA * np.max(D2))
+    Zpp = Zp[..., m]
+    D2p = D2[m]
+    out["average_pool"] = np.nanmean(Zpp, axis=-1)
+    out["disp_pool"] = (np.nansum(D2p * Zpp, axis=-1)
+                        / np.nansum(np.broadcast_to(D2p, Zpp.shape), axis=-1))
+    med_p = np.nanmedian(Zpp, axis=-1, keepdims=True)
+    q1p = np.nanpercentile(Zpp, 25, axis=-1, keepdims=True)
+    q3p = np.nanpercentile(Zpp, 75, axis=-1, keepdims=True)
+    sp = iqr_factor * (q3p - q1p)
+    rp = np.abs(Zpp - med_p)
+    tp = rp / (c * np.where(sp > 0, sp, 1.0))
+    wbp = np.where(sp > 0, np.where(tp < 1, (1.0 - tp ** 2) ** 2, 0.0), 1.0)
+    wp = D2p * wbp
+    nump = np.nansum(wp * Zpp, axis=-1)
+    denp = np.nansum(wp, axis=-1)
+    out["robust_pool"] = np.where(denp > 0, nump / denp, np.nan)
     return out
 
 
@@ -279,6 +300,45 @@ def fig6_gap(res, counts, BW, SNRS, embed_dir):
     fig.savefig(f); plt.close(fig); return f
 
 
+def fig7_pool(res, counts, BW, SNRS, embed_dir, ib=None, target=TARGET_RMSE):
+    key = counts[-1]; r = res[key]
+    if ib is None:
+        ib = len(BW) // 2
+    fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(15.5, 5.4))
+
+    ax0.semilogy(SNRS, r["rmse"]["average"][ib], "o-", color=COL["average"],
+                 label="average (all pairs)")
+    ax0.semilogy(SNRS, r["rmse"]["average_pool"][ib], "s--", color="#E69F00",
+                 label="average (filtered pool)")
+    ax0.semilogy(SNRS, r["rmse"]["disp_pool"][ib], "D-", color=COL["disp"],
+                 markerfacecolor="none", label="$D^2$ (filtered pool)")
+    ax0.semilogy(SNRS, r["rmse"]["robust_pool"][ib], "v--", color=COL["robust"],
+                 label="robust (filtered pool)")
+    ax0.semilogy(SNRS, r["crb"][ib], "k--", lw=1.6, label="CRB (all pairs)")
+    ax0.set_xlabel("SNR (dB)"); ax0.set_ylabel("RMSE (km)")
+    ax0.set_title("%d ch, B = %.3g kHz" % (key, BW[ib] / 1e3))
+    ax0.legend()
+
+    def sav(rr, base, w):
+        nb = np.array([snr_for_target(rr["rmse"][base][b], SNRS, target)
+                       for b in range(len(BW))])
+        nw = np.array([snr_for_target(rr["rmse"][w][b], SNRS, target)
+                       for b in range(len(BW))])
+        return np.nanmean(nb - nw)
+    s_all = [sav(res[c], "average", "disp") for c in counts]
+    s_pool = [sav(res[c], "average_pool", "disp_pool") for c in counts]
+    ax1.plot(counts, s_all, "o-", color=COL["disp"], label="all pairs")
+    ax1.plot(counts, s_pool, "s--", color="#E69F00", label="filtered pool")
+    ax1.set_xlabel("Number of channels")
+    ax1.set_ylabel(r"SNR saving of $D^2$ over averaging (dB)")
+    ax1.set_title("Residual value of weighting (RMSE = %.3g km)" % target)
+    ax1.legend()
+    fig.suptitle("Effect of removing uninformative pairs (D >= %.2f max D)"
+                 % POOL_ALPHA, y=1.02)
+    f = os.path.join(embed_dir, "F7_pool_effect.png")
+    fig.savefig(f); plt.close(fig); return f
+
+
 # ---------------------------------- main ----------------------------------
 def _load_res(run_dir, replot):
     """Return (res, counts, f5). replot=True loads estcomp_*.npz (fast);
@@ -291,13 +351,14 @@ def _load_res(run_dir, replot):
             d = np.load(f, allow_pickle=True)
             n = int(os.path.basename(f).rsplit("_", 1)[1].replace("ch.npz", ""))
             counts.append(n)
+            keys = [k for k in (ESTS + POOL_ESTS) if ("rmse_" + k) in d.files]
             res[n] = dict(
                 BW=d["BANDWIDTHS"], SNRS=d["SNRS_dB"],
-                rmse={k: d["rmse_" + k] for k in ESTS},
-                bias={k: d["bias_" + k] for k in ESTS},
-                std={k: d["std_" + k] for k in ESTS},
-                mae={k: d["mae_" + k] for k in ESTS},
-                success={k: d["success_" + k] for k in ESTS},
+                rmse={k: d["rmse_" + k] for k in keys},
+                bias={k: d["bias_" + k] for k in keys},
+                std={k: d["std_" + k] for k in keys},
+                mae={k: d["mae_" + k] for k in keys},
+                success={k: d["success_" + k] for k in keys},
                 crb=np.nanmean(d["crb_gls"], axis=0))
             f5_all[n] = dict(est={k: d["est_" + k] for k in ESTS},
                              D=d["pair_D_abs"], kbest=int(d["kbest"]),
@@ -365,6 +426,8 @@ def main(run_dir, replot=False):
             fig6_gap(res, counts, BW, SNRS, embed_dir)]
     if f5 is not None:
         made.append(fig5_distributions(f5, embed_dir))
+    if "disp_pool" in res[counts[-1]]["rmse"]:
+        made.append(fig7_pool(res, counts, BW, SNRS, embed_dir))
     print("figures:")
     for m in made:
         print("  ", m)
