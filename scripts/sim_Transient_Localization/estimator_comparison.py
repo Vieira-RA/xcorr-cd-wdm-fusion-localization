@@ -130,23 +130,33 @@ def gls_bound(d):
 
 # --------------------------------- plots ----------------------------------
 def fig1_money(res, counts, BW, SNRS, embed_dir):
-    key = counts[-1]
-    r = res[key]
     nb = len(BW)
-    bw_idx = [int(nb * 0.2), int(nb * 0.5), int(nb * 0.8)]
-    fig, axes = plt.subplots(1, 3, figsize=(17, 5.2), sharey=True)
-    for ax, ib in zip(axes, bw_idx):
-        for est in PLOT_ESTS:
-            mfc = "none" if est == "disp" else COL[est]
-            ax.semilogy(SNRS, r["rmse"][est][ib], marker=MARK[est], ms=MSS[est],
-                        color=COL[est], markerfacecolor=mfc, label=LBL[est])
-        ax.semilogy(SNRS, r["crb"][ib], "k--", lw=1.6, label="CRB (GLS)")
-        ax.set_title(r"$B = %.3g$ kHz" % (BW[ib] / 1e3))
-        ax.set_xlabel("SNR (dB)")
-        ax.set_ylim(bottom=1e-3)
-    axes[0].set_ylabel("RMSE (km)")
-    axes[0].legend(loc="upper right")
-    fig.suptitle("Estimation error vs SNR  (%d channels)" % key, y=1.02)
+    cols = [int(nb * 0.2), int(nb * 0.5), int(nb * 0.8)]
+    rows = [c for c in (4, 8, 12) if c in res] or list(counts)
+    nr, nc = len(rows), len(cols)
+    fig, axes = plt.subplots(nr, nc, figsize=(5.6 * nc, 4.3 * nr),
+                             sharex=True, sharey=True, squeeze=False)
+    for r, n in enumerate(rows):
+        rr = res[n]
+        for c, ib in enumerate(cols):
+            ax = axes[r, c]
+            for est in PLOT_ESTS:
+                mfc = "none" if est == "disp" else COL[est]
+                ax.semilogy(SNRS, rr["rmse"][est][ib], marker=MARK[est],
+                            ms=MSS[est], color=COL[est], markerfacecolor=mfc,
+                            label=LBL[est])
+            ax.semilogy(SNRS, rr["crb"][ib], "k--", lw=1.6, label="CRB (GLS)")
+            ax.set_ylim(bottom=1e-3)
+            if r == 0:
+                ax.set_title(r"$B = %.3g$ kHz" % (BW[ib] / 1e3))
+            if r == nr - 1:
+                ax.set_xlabel("SNR (dB)")
+            if c == 0:
+                ax.set_ylabel("RMSE (km)")
+                ax.text(0.04, 0.06, "%d ch" % n, transform=ax.transAxes,
+                        fontsize=15, fontweight="bold")
+    axes[0, 0].legend(loc="upper right")
+    fig.suptitle("Estimation error vs SNR across channel counts", y=1.005)
     f = os.path.join(embed_dir, "F1_rmse_vs_snr.png")
     fig.savefig(f); plt.close(fig); return f
 
@@ -176,24 +186,31 @@ def fig2_ratio_maps(res, counts, BW, SNRS, embed_dir):
 
 
 def fig3_snr_saving(res, counts, BW, SNRS, embed_dir, target=TARGET_RMSE):
-    key = counts[-1]; r = res[key]
-    navg = np.array([snr_for_target(r["rmse"]["average"][ib], SNRS, target)
-                     for ib in range(len(BW))])
-    fig, ax = plt.subplots(figsize=(9, 5.8))
-    for est in ["disp", "robust"]:
-        n = np.array([snr_for_target(r["rmse"][est][ib], SNRS, target)
-                      for ib in range(len(BW))])
-        d = navg - n
-        mfc = "none" if est == "disp" else COL[est]
-        ax.semilogx(BW, d, marker=MARK[est], ms=MSS[est], color=COL[est],
-                    markerfacecolor=mfc,
-                    label="%s vs average (mean %.1f dB)" % (LBL[est], np.nanmean(d)))
-    ax.axhline(0, color="k", lw=0.8)
-    ax.set_xlabel("Bandwidth (Hz)")
-    ax.set_ylabel("SNR saved over pure averaging (dB)")
-    ax.set_title("%d ch | SNR saving at RMSE = %.3g km" % (key, target))
-    ax.legend(loc="best")
+    rows = [c for c in (4, 8, 12) if c in res] or list(counts)
+    nc = len(rows)
+    fig, axes = plt.subplots(1, nc, figsize=(4.6 * nc, 5.2), sharey=True,
+                             squeeze=False)
+    axes = axes[0]
+    for ax, nch in zip(axes, rows):
+        r = res[nch]
+        navg = np.array([snr_for_target(r["rmse"]["average"][ib], SNRS, target)
+                         for ib in range(len(BW))])
+        for est in ["disp", "robust"]:
+            nn = np.array([snr_for_target(r["rmse"][est][ib], SNRS, target)
+                           for ib in range(len(BW))])
+            d = navg - nn
+            mfc = "none" if est == "disp" else COL[est]
+            ax.semilogx(BW, d, marker=MARK[est], ms=MSS[est], color=COL[est],
+                        markerfacecolor=mfc,
+                        label="%s (%.1f dB)" % (LBL[est], np.nanmean(d)))
+        ax.axhline(0, color="k", lw=0.8)
+        ax.set_xlabel("Bandwidth (Hz)")
+        ax.set_title("%d ch" % nch)
+        ax.legend(loc="lower right", fontsize=12)
+    axes[0].set_ylabel("SNR saved over pure averaging (dB)")
+    fig.suptitle("SNR saving at RMSE = %.3g km" % target, y=1.02)
     f = os.path.join(embed_dir, "F3_isoprecision.png")
+    fig.savefig(f); plt.close(fig); return f
     fig.savefig(f); plt.close(fig); return f
 
 
