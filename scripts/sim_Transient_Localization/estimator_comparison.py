@@ -40,12 +40,13 @@ import crb
 
 # ---------------------------- publication style ---------------------------
 plt.rcParams.update({
-    "font.size": 11, "font.family": "DejaVu Sans",
-    "axes.titlesize": 12, "axes.labelsize": 12,
-    "xtick.labelsize": 10, "ytick.labelsize": 10, "legend.fontsize": 9,
+    "font.size": 15, "font.family": "DejaVu Sans",
+    "axes.titlesize": 16, "axes.labelsize": 16,
+    "xtick.labelsize": 14, "ytick.labelsize": 14, "legend.fontsize": 13,
     "figure.dpi": 150, "savefig.dpi": 300, "savefig.bbox": "tight",
     "axes.grid": True, "grid.alpha": 0.25, "grid.linewidth": 0.6,
-    "axes.linewidth": 0.9, "lines.linewidth": 1.8, "legend.frameon": False,
+    "axes.linewidth": 1.0, "lines.linewidth": 2.4, "legend.frameon": False,
+    "lines.markersize": 8,
 })
 COL = {"single_worst": "#7F7F7F", "single": "#D55E00", "average": "#0072B2",
        "disp": "#009E73", "robust": "#CC79A7"}
@@ -55,6 +56,8 @@ LBL = {"single_worst": "single worst pair", "single": "single best pair",
 MARK = {"single_worst": "x", "single": "v", "average": "o", "disp": "s",
         "robust": "D"}
 ESTS = ["single_worst", "single", "average", "disp", "robust"]
+PLOT_ESTS = ["average", "disp", "robust"]      # curves shown in figures
+MSS = {"average": 9, "disp": 14, "robust": 8}  # per-estimator marker sizes
 
 TARGET_RMSE = 5.0          # km, used by the design figures (F3, F4)
 
@@ -131,17 +134,18 @@ def fig1_money(res, counts, BW, SNRS, embed_dir):
     r = res[key]
     nb = len(BW)
     bw_idx = [int(nb * 0.2), int(nb * 0.5), int(nb * 0.8)]
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.4), sharey=True)
+    fig, axes = plt.subplots(1, 3, figsize=(17, 5.2), sharey=True)
     for ax, ib in zip(axes, bw_idx):
-        for est in ESTS:
-            ax.semilogy(SNRS, r["rmse"][est][ib], marker=MARK[est], ms=4,
-                        color=COL[est], label=LBL[est])
-        ax.semilogy(SNRS, r["crb"][ib], "k--", lw=1.4, label="CRB (GLS)")
-        ax.set_title(r"$B = %.3g$ Hz" % BW[ib])
+        for est in PLOT_ESTS:
+            mfc = "none" if est == "disp" else COL[est]
+            ax.semilogy(SNRS, r["rmse"][est][ib], marker=MARK[est], ms=MSS[est],
+                        color=COL[est], markerfacecolor=mfc, label=LBL[est])
+        ax.semilogy(SNRS, r["crb"][ib], "k--", lw=1.6, label="CRB (GLS)")
+        ax.set_title(r"$B = %.3g$ kHz" % (BW[ib] / 1e3))
         ax.set_xlabel("SNR (dB)")
         ax.set_ylim(bottom=1e-3)
     axes[0].set_ylabel("RMSE (km)")
-    axes[0].legend(loc="upper right", fontsize=8)
+    axes[0].legend(loc="upper right")
     fig.suptitle("Estimation error vs SNR  (%d channels)" % key, y=1.02)
     f = os.path.join(embed_dir, "F1_rmse_vs_snr.png")
     fig.savefig(f); plt.close(fig); return f
@@ -149,21 +153,24 @@ def fig1_money(res, counts, BW, SNRS, embed_dir):
 
 def fig2_ratio_maps(res, counts, BW, SNRS, embed_dir):
     key = counts[-1]; r = res[key]
-    info = [("single_worst", "worst single pair"),
-            ("single", "best single pair"),
-            ("average", "pure average")]
-    fig, axes = plt.subplots(1, 3, figsize=(16, 4.8), sharey=True)
+    dB = 20.0 * np.log10(r["rmse"]["average"] / r["rmse"]["robust"])
+    fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(15.5, 5.2),
+                                   gridspec_kw={"width_ratios": [1.3, 1]})
     X, Y = np.meshgrid(SNRS, BW)
-    dB = {k: 20.0 * np.log10(r["rmse"][k] / r["rmse"]["robust"]) for k, _ in info}
-    vmax = np.nanmax([np.nanmax(v) for v in dB.values()])
-    for ax, (k, t) in zip(axes, info):
-        pc = ax.pcolormesh(X, Y, dB[k], shading="auto", cmap="magma",
-                           vmin=0, vmax=vmax)
-        ax.set_yscale("log"); ax.set_xlabel("SNR (dB)")
-        ax.set_title("%s: improvement over robust" % t)
-        fig.colorbar(pc, ax=ax, label="dB")
-    axes[0].set_ylabel("Bandwidth (Hz)")
-    fig.suptitle("Improvement over robust fusion (dB), %d ch" % key, y=1.02)
+    pc = ax0.pcolormesh(X, Y, dB, shading="auto", cmap="magma",
+                        vmin=0, vmax=np.nanmax(dB))
+    ax0.set_yscale("log"); ax0.set_xlabel("SNR (dB)")
+    ax0.set_ylabel("Bandwidth (Hz)")
+    ax0.set_title("pure average: improvement over robust")
+    fig.colorbar(pc, ax=ax0, label="improvement (dB)")
+
+    # diagnostic: improvement at the highest SNR, versus bandwidth
+    is_hi = len(SNRS) - 1
+    ax1.semilogx(BW, dB[:, is_hi], "o-", color=COL["disp"])
+    ax1.set_xlabel("Bandwidth (Hz)")
+    ax1.set_ylabel("improvement at SNR = %.0f dB (dB)" % SNRS[is_hi])
+    ax1.set_title("high-SNR diagnostic")
+    fig.suptitle("Robust vs pure averaging, %d ch" % key, y=1.02)
     f = os.path.join(embed_dir, "F2_improvement_maps.png")
     fig.savefig(f); plt.close(fig); return f
 
@@ -172,12 +179,14 @@ def fig3_snr_saving(res, counts, BW, SNRS, embed_dir, target=TARGET_RMSE):
     key = counts[-1]; r = res[key]
     navg = np.array([snr_for_target(r["rmse"]["average"][ib], SNRS, target)
                      for ib in range(len(BW))])
-    fig, ax = plt.subplots(figsize=(7.8, 5.4))
+    fig, ax = plt.subplots(figsize=(9, 5.8))
     for est in ["disp", "robust"]:
         n = np.array([snr_for_target(r["rmse"][est][ib], SNRS, target)
                       for ib in range(len(BW))])
         d = navg - n
-        ax.semilogx(BW, d, marker=MARK[est], ms=4, color=COL[est],
+        mfc = "none" if est == "disp" else COL[est]
+        ax.semilogx(BW, d, marker=MARK[est], ms=MSS[est], color=COL[est],
+                    markerfacecolor=mfc,
                     label="%s vs average (mean %.1f dB)" % (LBL[est], np.nanmean(d)))
     ax.axhline(0, color="k", lw=0.8)
     ax.set_xlabel("Bandwidth (Hz)")
@@ -192,16 +201,20 @@ def fig4_snr_vs_channels(res, counts, BW, SNRS, embed_dir, ib=None,
                          target=TARGET_RMSE):
     if ib is None:
         ib = len(BW) // 2
-    fig, ax = plt.subplots(figsize=(7.8, 5.2))
-    for est in ["average", "disp", "robust"]:
+    fig, ax = plt.subplots(figsize=(9, 5.8))
+    for est in PLOT_ESTS:
         y = [snr_for_target(res[c]["rmse"][est][ib], SNRS, target) for c in counts]
-        ax.plot(counts, y, marker=MARK[est], color=COL[est], label=LBL[est])
+        mfc = "none" if est == "disp" else COL[est]
+        ax.plot(counts, y, marker=MARK[est], ms=MSS[est], color=COL[est],
+                markerfacecolor=mfc, label=LBL[est])
     y = [snr_for_target(res[c]["crb"][ib], SNRS, target) for c in counts]
-    ax.plot(counts, y, "k--", lw=1.4, label="CRB (GLS)")
+    ax.plot(counts, y, "k--", lw=1.6, label="CRB (GLS)")
     ax.set_xlabel("Number of channels")
-    ax.set_ylabel("SNR for RMSE = %.3g km (dB)" % target)
-    ax.set_title("Design curve (B = %.3g Hz)" % BW[ib])
+    ax.set_ylabel("SNR for RMSE = %.3g km (dB), lower = better" % target)
+    ax.set_title("Design curve (B = %.3g kHz)" % (BW[ib] / 1e3))
     ax.legend()
+    ax.text(0.02, 0.02, "curve absent = target not reached within SNR grid",
+            transform=ax.transAxes, fontsize=12, color="0.3")
     f = os.path.join(embed_dir, "F4_db_gain_vs_channels.png")
     fig.savefig(f); plt.close(fig); return f
 
@@ -211,18 +224,21 @@ def fig5_distributions(f5, embed_dir, ib=None, is_=None):
     if ib is None:
         ib = len(BW) // 2
     if is_ is None:
-        is_ = int(np.argmin(np.abs(SNRS - 35.0)))
-    fig, ax = plt.subplots(figsize=(7.8, 5.4))
-    for k in ESTS:
+        is_ = int(np.argmin(np.abs(SNRS - 50.0)))
+    fig, ax = plt.subplots(figsize=(9, 5.8))
+    for k in PLOT_ESTS:
         e = np.clip(np.sort(np.abs(np.ravel(est[k][:, ib, is_, :] - Ztrue))),
                     1e-6, None)
         y = np.arange(1, len(e) + 1) / len(e)
         ax.loglog(e, y, color=COL[k], label=LBL[k])
-    for frac, ls in [(0.01, ":"), (0.05, "--")]:
-        ax.axvline(frac * Ztrue, color="k", ls=ls, lw=0.8)
+    for frac, ls, lab in [(0.01, ":", "1%"), (0.05, "--", "5%")]:
+        ax.axvline(frac * Ztrue, color="k", ls=ls, lw=1.0)
+        ax.text(frac * Ztrue * 1.08, 0.4, "%s tolerance" % lab, rotation=90,
+                va="center", ha="left", fontsize=12, color="0.3")
     ax.set_xlabel("|error| (km)")
     ax.set_ylabel(r"fraction of estimates $\leq x$")
-    ax.set_title("ECDF of error (B=%.3g Hz, SNR=%.0f dB)" % (BW[ib], SNRS[is_]))
+    ax.set_title("ECDF of error (B = %.3g kHz, SNR = %.0f dB)"
+                 % (BW[ib] / 1e3, SNRS[is_]))
     ax.legend(loc="lower right")
     f = os.path.join(embed_dir, "F5_error_distributions.png")
     fig.savefig(f); plt.close(fig); return f
@@ -230,20 +246,23 @@ def fig5_distributions(f5, embed_dir, ib=None, is_=None):
 
 def fig6_gap(res, counts, BW, SNRS, embed_dir):
     key = counts[-1]; r = res[key]; ib = len(BW) // 2
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5.2))
-    for est in ESTS:
+    fig, axes = plt.subplots(1, 2, figsize=(15, 5.8))
+    for est in PLOT_ESTS:
+        mfc = "none" if est == "disp" else COL[est]
         axes[0].semilogy(SNRS, r["std"][est][ib] / r["crb"][ib],
-                         marker=MARK[est], ms=4, color=COL[est], label=LBL[est])
+                         marker=MARK[est], ms=MSS[est], color=COL[est],
+                         markerfacecolor=mfc, label=LBL[est])
         axes[1].semilogy(SNRS, np.abs(r["bias"][est][ib]),
-                         marker=MARK[est], ms=4, color=COL[est], label=LBL[est])
-    axes[0].axhline(1.0, color="k", ls="--", lw=1.2)
+                         marker=MARK[est], ms=MSS[est], color=COL[est],
+                         markerfacecolor=mfc, label=LBL[est])
+    axes[0].axhline(1.0, color="k", ls="--", lw=1.4, label=r"CRB ($=10^0$)")
     axes[0].set_ylabel("std / CRB")
-    axes[0].set_title("Variance efficiency (B=%.3g Hz)" % BW[ib])
+    axes[0].set_title("Variance efficiency (B = %.3g kHz)" % (BW[ib] / 1e3))
     axes[1].set_ylabel("|bias| (km)")
     axes[1].set_title("Bias")
     for a in axes:
         a.set_xlabel("SNR (dB)")
-    axes[0].legend(fontsize=8)
+    axes[0].legend()
     f = os.path.join(embed_dir, "F6_gap_to_crb.png")
     fig.savefig(f); plt.close(fig); return f
 
