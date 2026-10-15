@@ -35,7 +35,7 @@ from quaternion import (
     quaternion_rotate_stokes,
 )
 from rotations import rotate_centroid_to_north_pole
-from signal_processing import parabolic_corr_delay_2d
+from signal_processing import parabolic_corr_delay_2d, gcc_phat_2d
 from estimation import iqr_filter
 from chromatic_dispersion import integrated_dispersion
 
@@ -87,7 +87,8 @@ def apply_filter(sig, ba):
 
 # ---------------------------------------------------------------------------
 def process_one(clean2d, sigma2, pair_indices, D_abs, crb_dist_pair, w_gls,
-                dt, ba, i_snr, i_real, seed):
+                dt, ba, i_snr, i_real, seed,
+                est_method="parabolic", f_max=0.0, mag_threshold=0.05):
     """One (SNR, realisation) for a given bandwidth. Returns estimates + Zs."""
     rng = np.random.RandomState(seed)
     noisy = clean2d + np.sqrt(sigma2) * rng.randn(*clean2d.shape)
@@ -97,7 +98,10 @@ def process_one(clean2d, sigma2, pair_indices, D_abs, crb_dist_pair, w_gls,
     Z = np.empty(n_pairs)
     for k, (i, j) in enumerate(pair_indices):
         # same argument order convention as process_sweep.py
-        delay = parabolic_corr_delay_2d(noisy[j], noisy[i], dt)
+        if est_method == "gcc_phat":
+            delay = gcc_phat_2d(noisy[j], noisy[i], dt, f_max, mag_threshold)
+        else:
+            delay = parabolic_corr_delay_2d(noisy[j], noisy[i], dt)
         Z[k] = delay * 1e12 / D_abs[k]
 
     # inverse-variance (CRB) weights
@@ -155,6 +159,11 @@ def main(config_path):
     # joblib workers: CRB_N_JOBS env var (HPC/SLURM) overrides the config
     n_jobs = int(os.environ.get("CRB_N_JOBS",
                                 cfg.get("run", {}).get("n_jobs", -1)))
+    est_method = analysis.get("estimator", "parabolic").lower()
+    _phat = cfg.get("phat", {})
+    fmax_factor = float(_phat.get("fmax_factor", 2.0))
+    mag_threshold = float(_phat.get("mag_threshold", 0.05))
+    print(f"Estimator: {est_method}")
     os.makedirs(run_dir, exist_ok=True)
 
     meta = np.load(os.path.join(jones_dir, "metadata.npz"), allow_pickle=True)
@@ -310,7 +319,8 @@ def main(config_path):
                     for r in range(N_REAL):
                         jobs.append(delayed(process_one)(
                             clean2d, sigma2, pair_indices, D_abs, cdp, w_gls,
-                            dt, ba, i_snr, r, noise_seed + i_f * 100003 + r
+                            dt, ba, i_snr, r, noise_seed + i_f * 100003 + r,
+                            est_method, fmax_factor * bw, mag_threshold
                         ))
 
                 results = Parallel(n_jobs=n_jobs, batch_size=1)(jobs)

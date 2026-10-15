@@ -218,36 +218,28 @@ def fig2_ratio_maps(res, counts, BW, SNRS, embed_dir):
     fig.savefig(f); plt.close(fig); return f
 
 
-def fig3_snr_saving(res, counts, BW, SNRS, embed_dir, target=TARGET_RMSE):
+def fig3_snr_saving(res, counts, BW, SNRS, embed_dir, target=TARGET_RMSE,
+                    est="disp_pool"):
     use = list(counts)
     cmap = plt.cm.viridis(np.linspace(0.0, 0.85, len(use)))
     mk = ["o", "s", "^", "v", "D", "P", "X", "*"]
-    fig, ax = plt.subplots(figsize=(10.5, 6.4))
+    fig, ax = plt.subplots(figsize=(9.6, 5.8))
     for ci, nch in enumerate(use):
         r = res[nch]
         navg = np.array([snr_for_target(r["rmse"]["average_pool"][ib], SNRS, target)
                          for ib in range(len(BW))])
-        for est, ls in [("disp_pool", "--"), ("robust_pool", "-")]:
-            nn = np.array([snr_for_target(r["rmse"][est][ib], SNRS, target)
-                           for ib in range(len(BW))])
-            d = navg - nn
-            mfc = "none" if est == "disp" else cmap[ci]
-            ax.semilogx(BW, d, ls, marker=mk[ci % len(mk)], ms=10,
-                        color=cmap[ci], markerfacecolor=mfc)
+        nn = np.array([snr_for_target(r["rmse"][est][ib], SNRS, target)
+                       for ib in range(len(BW))])
+        d = navg - nn
+        ax.semilogx(BW, d, marker=mk[ci % len(mk)], ms=10, color=cmap[ci],
+                    label="%d ch" % nch)
     ax.axhline(0, color="k", lw=0.8)
     ax.set_xlabel("Bandwidth (Hz)")
     ax.set_ylabel("SNR saved over pure averaging (dB)")
-    ax.set_title("SNR saving at RMSE = %.3g km" % target)
-    ch_h = [Line2D([], [], color=cmap[i], marker=mk[i % len(mk)], ls="none",
-                   ms=11, label="%d ch" % use[i]) for i in range(len(use))]
-    est_h = [Line2D([], [], color="0.3", ls="--", label=LBL["disp_pool"]),
-             Line2D([], [], color="0.3", ls="-", label=LBL["robust_pool"])]
-    l1 = ax.legend(handles=ch_h, title="channels", loc="lower left",
-                   ncol=len(use), fontsize=12, title_fontsize=12)
-    ax.add_artist(l1)
-    ax.legend(handles=est_h, loc="center right", fontsize=12)
+    ax.set_title("Weighting benefit: %s vs pure averaging (RMSE = %.3g km)"
+                 % (LBL.get(est, est), target))
+    ax.legend(title="channels")
     f = os.path.join(embed_dir, "F3_isoprecision.png")
-    fig.savefig(f); plt.close(fig); return f
     fig.savefig(f); plt.close(fig); return f
 
 
