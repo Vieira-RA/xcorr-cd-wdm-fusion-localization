@@ -138,31 +138,22 @@ estimates (`est_crb`, `est_gls`, `est_lambda`, `est_crb_iqr`), CRB arrays
 
 ---
 
-## 6. Open items / handoff for the next session
+## 6. Handoff
 
-**In flight**
-* `estimator_variants.slurm` (parabolic / phase-slope / GCC-PHAT / **signed**)
-  is being run to decide the estimator. Goal: find one with **low bias *and*
-  low std**. Prior knowledge: **phase-slope is unbiased but high-variance**.
+**See [`../../HANDOFF.md`](../../HANDOFF.md) for the full handoff.** Summary:
 
-**Decisions pending (after `variants_*` tables)**
-1. If a variant (likely **signed**: coherent `corr_x+corr_y` + parabola) has low
-   bias and low std → adopt it, rerun the equispaced grid, and the high-SNR
-   floor drops.
-2. If only phase-slope is unbiased → either apply a **multiplicative bias
-   correction** (~1/(1−0.0046) calibrated per bandwidth) or present the
-   **bias↔variance trade-off as a limitation** (already agreed acceptable).
-3. Make **robust the headline combiner** for the equispaced study, and add a
-   **bias-vs-bandwidth** panel.
+* **Estimator decision (made):** parabolic and **GCC-PHAT** are
+  **regime-dependent** — parabolic wins at low SNR / low bandwidth
+  (variance-limited), GCC-PHAT wins at high SNR / high bandwidth (bias-limited).
+  Phase-slope is unbiased but high-variance; "signed" gave no improvement. Both
+  runs exist: `results_crb_equispaced` (parabolic) and
+  `results_crb_equispaced_gcc` (GCC-PHAT).
+* **Robust (bisquare) is the best combiner** on the equispaced grid.
+* **Paper rewritten** to the full "how to reach the CRB" narrative in
+  `paper/CRB_transient_localization_optica.tex`.
 
-**Not to touch yet**
-* `paper/` narrative is frozen; update only after the estimator decision.
-
-**Recompute needed to refresh figures with the star bound / RMSE panel**
-```bash
-sbatch estimator_comparison.slurm results_crb_equispaced
-sbatch estimator_comparison.slurm results_crb_full_pairs   # optional
-```
+**Next steps:** compile/trim the paper; optionally prototype a bias-corrected
+parabolic estimator. Commands and gotchas: `HANDOFF.md`.
 
 ---
 
