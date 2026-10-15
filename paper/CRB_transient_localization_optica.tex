@@ -1,16 +1,14 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Optica meeting/conference manuscript (OFC-style)
-%  Based on OPTICAmeetings.tex (opticameet3.sty)
+%  Optica meeting/conference manuscript (OFC-style) -- FULL working version
+%  Narrative: "How to reach the CRB in practice" (pair selection, robust
+%  fusion, estimator bias).  Intentionally detailed; trim later.
 %
-%  TODO: authors/affiliations, verify references, swap placeholder figures
-%        with results_crb_full_pairs/figs_estimators/*.png
-%
-%  The final "Appendix: Equation reference" page is a working reference and
-%  is NOT intended for submission.
+%  TODO before submission: authors, verify references, trim abstract to
+%  ~35 words, move the equation appendix to supplementary.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \documentclass[letterpaper,10pt]{article}
 
-\usepackage{opticameet3}          % provided by Optica (OFC template)
+\usepackage{opticameet3}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
@@ -27,9 +25,10 @@
 \newcommand{\CRB}{\mathrm{CRB}}
 \newcommand{\med}{\mathrm{med}}
 \newcommand{\Var}{\mathrm{Var}}
+\newcommand{\MSE}{\mathrm{MSE}}
 
-\title{Pair Selection Reaches the Cram\'er--Rao Bound in Multi-Channel
-Transient Localisation over WDM Fibres}
+\title{How to Reach the Cram\'er--Rao Bound in Multi-Channel Transient
+Localisation over WDM Fibres: Pair Selection, Robust Fusion, and Estimator Bias}
 
 \author{Author One,\authormark{1} Author Two,\authormark{1,*} and Author Three\authormark{2}}
 
@@ -39,69 +38,116 @@ Transient Localisation over WDM Fibres}
 \email{\authormark{*}author@institution.edu}
 
 \begin{abstract}
-A perturbation modulates the polarisation along a WDM fibre; chromatic
-dispersion delays its signature across channels. We derive the
-Cram\'er--Rao bound and show that selecting well-separated channel pairs
---- not fusing all pairs --- attains it.
+A transient perturbation modulates the state of polarisation along a WDM
+fibre; chromatic dispersion makes its signature arrive at different times
+across channels, so the inter-channel delay yields the perturbation distance.
+We derive the two-sensor effective-SNR Cram\'er--Rao bound (CRB) for this
+problem and study, end to end, the three practical levers that decide how close
+a real estimator gets to it: (i)~which channel pairs to use, (ii)~how to fuse
+them, and (iii)~which delay estimator to apply. We show that \emph{pair
+selection} is the essential step (dispersion weighting is its soft-filter
+equivalent); that a \emph{robust} (bisquare) combiner is best on a realistic
+equispaced channel grid; and that the widely used parabolic peak estimator is
+variance-optimal but \emph{biased}, so an unbiased alternative (GCC-PHAT) wins
+at high SNR --- a regime-dependent trade-off we quantify. We report the scaling
+laws in SNR, bandwidth, channel count and fibre count. The result is a
+rigorous bound together with a practical recipe.
 \end{abstract}
 
 \section{Introduction}
-Optical fibre sensing localises mechanical transients (vibration, strain,
-acoustic waves) along a link and supports infrastructure monitoring and
-intrusion detection~\cite{taylor1993das,he2022das}. When the link carries a WDM
-comb, a \emph{single} transient imprints a \emph{wavelength-dependent} delay:
-chromatic dispersion (CD) makes the signature arrive at different times in
-different channels. The inter-channel delay is proportional to the travelled
-distance, so multi-channel time-delay estimation directly yields the range
-$Z$~\cite{sadler2003survey}. With $\sim\!10$ channels, hundreds of channel pairs
-are available, which naively suggests that fusing them must improve accuracy.
+\label{sec:intro}
+Distributed optical sensing localises mechanical perturbations (vibration,
+strain, acoustic transients) along a fibre and underpins applications from
+infrastructure monitoring to intrusion detection~\cite{taylor1993das,he2022das}.
+When the link carries a WDM comb, a \emph{single} transient imprints a
+\emph{wavelength-dependent} delay: chromatic dispersion (CD) makes the signature
+arrive at different times in different channels. The inter-channel delay is
+proportional to the travelled distance, so multi-channel time-delay estimation
+directly yields the range $Z$~\cite{sadler2003survey}. With $\sim\!10$ channels,
+hundreds of channel pairs are available, which naively suggests that fusing them
+must improve accuracy.
 
-We show, at proof-of-concept level, that the essential step is \emph{pair
-selection}. Naive fusion over \emph{all} channel pairs is dominated by
-uninformative small-separation pairs; restricting to \emph{well-separated}
-pairs attains the bound, and dispersion weighting is simply the soft-filter
-equivalent. Our contributions are: (i)~the effective-SNR Cram\'er--Rao bound
-(CRB) for CD-based transient localisation, validated against Monte Carlo;
-(ii)~the result that equal-weight fusion over all pairs falls far from the bound
-(and can be beaten by a single well-chosen pair), whereas selecting
-well-separated pairs --- combined equally or by dispersion weighting --- attains
-it; and (iii)~signal-to-noise-ratio (SNR)-free estimators plus the scaling laws
-that turn this into a design rule.
+This paper asks a practical question: \emph{given a bound, how do we reach it?}
+We identify three levers --- pair selection, fusion rule, and delay estimator ---
+and quantify each with an end-to-end PMD/CD simulation.
 
-\section{System Model and Cram\'er--Rao Bound}
-A fixed input state of polarisation (SOP) propagates through a fibre with
-polarisation-mode dispersion (PMD; random wave-plate model) and CD. A transient
-of bandwidth $B$ modulates the local birefringence over a short section at
-distance $Z$. We represent the received SOP by its 2-D Stokes projection
-$(S_1,S_2)$ after rotating the centroid to the north pole. For channels at
-wavelengths $\lambda_i,\lambda_j$ the CD delay is
+\smallskip
+\noindent\textbf{Contributions.}
+\begin{enumerate}\setlength\itemsep{1pt}
+\item \textbf{The bound.} We derive the two-sensor \emph{effective-SNR}
+Cram\'er--Rao bound for CD-based transient localisation
+(Sec.~\ref{sec:crb}) and validate it: the per-pair bound matches Monte-Carlo to
+within $\sim\!10\%$.
+\item \textbf{Pair selection $\equiv$ weighting} (Sec.~\ref{sec:fusion},
+Fig.~\ref{fig:pool}). Fusing \emph{all} channel pairs with equal weight is
+catastrophic (dominated by uninformative small-separation pairs). Restricting to
+\emph{well-separated} pairs attains the bound, after which equal, dispersion- and
+robust-weighted fusion coincide --- dispersion weighting is simply the
+soft-filter equivalent of an explicit threshold.
+\item \textbf{Robust fusion wins on a realistic grid} (Sec.~\ref{sec:fusion},
+Fig.~\ref{fig:alpha}). On an equispaced channel grid a Tukey-bisquare combiner
+gives the lowest RMSE across the plane.
+\item \textbf{Estimator bias limits high SNR} (Sec.~\ref{sec:estimators},
+Fig.~\ref{fig:estimators}). The parabolic peak interpolator is variance-optimal
+but carries a systematic bias that dominates at high SNR and low bandwidth;
+GCC-PHAT is unbiased and wins there --- a \emph{regime-dependent} trade-off.
+\item \textbf{Scaling laws} (Sec.~\ref{sec:results}): $\sigma_Z\propto
+1/(\sqrt{\SNR}\,B)$, monotone improvement with channel count, and
+$1/\sqrt{N_{\rm fib}}$ across independent fibres.
+\end{enumerate}
+
+\section{System model}
+\label{sec:model}
+\textbf{Polarisation and the Jones/Stokes picture.} A fixed input state of
+polarisation (SOP) $\hat s_{\rm in}$ propagates through the fibre. The link is
+described by a frequency-dependent unitary Jones matrix $U(\omega)$; the output
+Stokes vector is the rotation
 \begin{equation}
-\tau_{ij}=Z\,D_{ij},\quad
-D_{ij}=\int_{\lambda_j}^{\lambda_i}\!D(\lambda)\,d\lambda,\quad
+\mathbf s_{\rm out}(\omega)=R\big(U(\omega)\big)\,\mathbf s_{\rm in},
+\end{equation}
+where $R(U)$ is the $3\times3$ rotation induced by $U$ (via the Pauli matrices).
+We represent the received SOP by its 2-D Stokes projection $(S_1,S_2)$ after
+rotating the centroid to the north pole, which removes the static SOP offset.
+
+\smallskip
+\noindent\textbf{Fibre propagation (PMD + CD).} Birefringence is modelled with a
+random wave-plate model: the fibre is a cascade of segments of length $L_F$ with
+random orientation and a birefringence vector
+$\boldsymbol\beta(z)=\boldsymbol\beta_0(z)+\Delta\omega\,\boldsymbol\beta'(z)$,
+so that $dU/dz=-\tfrac{i}{2}[\boldsymbol\beta(z)\!\cdot\!\boldsymbol\sigma]U$
+is integrated along $z$. This produces a realistic frequency autocorrelation
+(i.e. PMD) between channels. Chromatic dispersion is applied separately as a
+deterministic, channel-dependent group delay.
+
+\smallskip
+\noindent\textbf{Transient and its bandwidth.} A transient of (3-dB) bandwidth
+$B$ modulates the local birefringence over a short section at distance $Z$
+through a Gaussian envelope
+\begin{equation}
+s_{\rm env}(t)=1+A_{\rm p}\exp\!\Big[-\frac{(t-t_0)^2}{2\sigma_t^2}\Big],
+\qquad \sigma_t=\frac{0.3748}{B}.
+\label{eq:env}
+\end{equation}
+The perturbation thus appears as a transient bump in the SOP; its
+\emph{bandwidth} $B$ sets how fast the signature evolves and therefore the
+achievable timing precision.
+
+\smallskip
+\noindent\textbf{CD delay $\to$ distance.} For channels at wavelengths
+$\lambda_i,\lambda_j$ the CD delay is
+\begin{equation}
+\tau_{ij}=Z\,D_{ij},\qquad
+D_{ij}=\int_{\lambda_j}^{\lambda_i}\! D(\lambda)\,d\lambda,\qquad
 D(\lambda)=D_0+S_0(\lambda-\lambda_0),
+\label{eq:cd}
 \end{equation}
-hence a pair-distance estimate is $\hat{Z}_{ij}=\hat{\tau}_{ij}/D_{ij}$.
-
-For a discrete signal $x[n]$ with per-sample noise variance $\sigma^2$, the
-\emph{energy} SNR is $\SNR=E/N_0=\sum_n x[n]^2/\sigma^2$, and the mean-square
-bandwidth is $\beta^2=\sum_k(2\pi f_k)^2|X_k|^2/\sum_k|X_k|^2$. For two noisy
-observations of a common signal, the delay information is governed by the
-\emph{effective} SNR $\SNReff(f)=\rho_1\rho_2/(1+\rho_1+\rho_2)$, with
-$\rho_i=S/N_i$; for equal sensors $\SNReff=\rho^2/(1+2\rho)$. The Fisher
-information and CRB are
-\begin{equation}
-J_{ij}=\sum_k \omega_k^2\,\SNReff(f_k),\qquad
-\CRB(\tau_{ij})=1/J_{ij},\qquad
-\sigma_{Z,ij}=\frac{\sqrt{\CRB(\tau_{ij})}}{D_{ij}}.
-\end{equation}
-At high SNR $\SNReff\!\to\!\rho/2$ and $\CRB=1/(\SNR\beta^2)$: SNR and
-\emph{bandwidth} are the fundamental limits. Equation~(2) is our reference
-throughout.
+hence a pair-distance estimate is $\hat Z_{ij}=\hat\tau_{ij}/D_{ij}$. The
+dispersion integral $D_{ij}$ is a \emph{known} fibre property, so pairs with a
+large $|D_{ij}|$ are a-priori identifiable.
 
 \begin{figure}[t]
 \centering
 \begin{tikzpicture}[font=\footnotesize,>=Latex,node distance=4mm]
-% ---- panel (a): schematic ----
 \node[draw,rounded corners,minimum height=5mm,minimum width=9mm] (tx){TX};
 \node[draw,rounded corners,minimum height=5mm,minimum width=24mm,right=5mm of tx] (link){fibre (PMD+CD)};
 \node[right=5mm of link,star,star points=6,star point height=1.8mm,draw,fill=red!60,inner sep=0pt,minimum size=3.2mm] (ev){};
@@ -110,7 +156,6 @@ throughout.
 \node[draw,rounded corners,minimum height=5mm,minimum width=10mm,below=3mm of rx] (dsp){fusion};
 \draw[->] (tx)--(link); \draw[->] (link)--(ev); \draw[->] (ev)--(rx); \draw[->] (rx)--(dsp);
 \node[right=1mm of rx,align=left,font=\scriptsize]{$\lambda_1\!:\!\tau_1$\\$\lambda_2\!:\!\tau_2$\\$\vdots$};
-% ---- panel (b): same transient, shifted per carrier by CD ----
 \begin{scope}[yshift=-2.35cm]
 \draw[->] (0,0)--(6.6,0) node[right,font=\scriptsize]{$t$};
 \draw[->] (0,0)--(0,1.35) node[above,font=\scriptsize]{SOP};
@@ -122,93 +167,251 @@ throughout.
 \node[font=\scriptsize,align=left] at (6.05,0.95){same\\transient};
 \end{scope}
 \end{tikzpicture}
-\caption{(a) A transient at distance $Z$ modulates the local birefringence; the received SOP is demultiplexed per carrier. (b) Chromatic dispersion makes the \emph{same} transient appear time-shifted across carriers by
+\caption{(a) A transient at distance $Z$ modulates the local birefringence; the
+received SOP is demultiplexed per carrier. (b) Chromatic dispersion makes the
+\emph{same} transient appear time-shifted across carriers by
 $\tau_{ij}=Z\!\int\!D\,d\lambda$ --- this inter-channel delay encodes $Z$.}
 \label{fig:concept}
 \end{figure}
 
-\section{Multi-Channel Fusion Estimators}
-From one estimate per channel pair, the distance is a weighted mean
-$\hat Z=\sum_{ij}w_{ij}\hat Z_{ij}/\sum_{ij}w_{ij}$. We compare four
-\emph{SNR-free} rules (only the known $D_{ij}$ is used):
-\begin{itemize}\setlength\itemsep{1pt}
-\item \textbf{Single pair}: one channel pair (best $=\max D$, worst $=\min D$).
-\item \textbf{Average}: $w_{ij}=1$ (naive).
-\item \textbf{Dispersion-weighted}: $w_{ij}=D_{ij}^2$, the minimum-variance weight
-because $\sigma_{Z,ij}\!\propto\!1/D_{ij}$ when the per-pair CRB is common.
-\item \textbf{Robust}: $w_{ij}=D_{ij}^2\,\psi(r_{ij})$ with a Tukey-bisquare
-$\psi=(1-(r/(c\,s))^2)^2$ on residuals $r_{ij}=|\hat Z_{ij}-\med\hat Z|$,
-$s=\mathrm{IQR}$; it suppresses threshold-region outliers.
-\end{itemize}
-Because pairs share channels, their errors are correlated; a strict bound
-requires the full covariance (a structured GLS combination). We use Eq.~(2) as
-a tight practical reference and note the correlation penalty as a caveat.
+\section{Cram\'er--Rao bound}
+\label{sec:crb}
+\textbf{Energy SNR.} For a discrete signal $x[n]$ with per-sample noise
+variance $\sigma^2$, the \emph{energy} SNR is
+\begin{equation}
+\SNR=\frac{E}{N_0}=\frac{\sum_n x[n]^2}{\sigma^2},
+\qquad N_0=\sigma^2\,dt,
+\end{equation}
+where $E=\int x^2\,dt$ and $N_0$ is the two-sided noise PSD. To realise a target
+SNR we inject Gaussian noise with variance $\sigma^2=\sum_n x[n]^2/\SNR_{\rm lin}$.
 
-\section{Results}
-We simulate $10$ independent PMD fibres, a C+L WDM comb (241 channels,
-50~GHz), $B\!\in\![200\,$Hz$,2\,$MHz$]$, energy
-SNR$\,\in\![15,100]\,$dB, $100$ realisations, and channel subsets of size
-$4$--$12$ (extremes first); delays use parabolic interpolation of the 2-D
-cross-correlation.
+\smallskip
+\noindent\textbf{Mean-square bandwidth.} The RMS bandwidth that sets the delay
+precision is
+\begin{equation}
+\beta^2=\frac{\int (2\pi f)^2|S(f)|^2\,df}{\int|S(f)|^2\,df}
+=\frac{\sum_k (2\pi f_k)^2|X_k|^2}{\sum_k |X_k|^2}.
+\label{eq:beta}
+\end{equation}
+
+\smallskip
+\noindent\textbf{Two-sensor effective SNR.} For two noisy observations of a
+common signal the delay information is governed by the \emph{effective} SNR,
+\begin{equation}
+\SNReff(f)=\frac{(S/N_1)(S/N_2)}{1+S/N_1+S/N_2},
+\qquad
+\SNReff=\frac{\rho^2}{1+2\rho}\ \ (\text{equal sensors},\ \rho=S/N_0).
+\label{eq:effsnr}
+\end{equation}
+This combines the two sensors' SNRs \emph{before} any correlation; it is not the
+cross-correlation SNR.
+
+\smallskip
+\noindent\textbf{Fisher information and the CRB.}
+\begin{equation}
+J_{ij}=\sum_k \omega_k^2\,\SNReff(f_k),\qquad
+\CRB(\tau_{ij})=1/J_{ij},\qquad
+\sigma_{Z,ij}=\sqrt{\CRB(\tau_{ij})}\,\frac{1}{D_{ij}} .
+\label{eq:crb}
+\end{equation}
+At high SNR $\SNReff\!\to\!\rho/2$, so $\CRB\!\to\!1/(\SNR\beta^2)$: \emph{SNR
+and bandwidth are the fundamental limits.}
+
+\smallskip
+\noindent\textbf{Combining pairs: naive vs.\ star vs.\ GLS.} The naive
+inverse-variance combination assumes the pair estimates are independent;
+because all pairs share channels they are \emph{correlated} (only $n_{\rm ch}-1$
+delays are independent), so it is optimistic. The achievable reference is the
+\emph{star} combination: pick one reference channel and keep only the
+$n_{\rm ch}-1$ pairs connecting it to the others,
+\begin{equation}
+\sigma_{Z,\rm star}=\Bigl[\max_r \sum_{k\neq r} D_{rk}^2\big/(\CRB(\tau_{rk})\cdot10^{24})\Bigr]^{-1/2}.
+\label{eq:star}
+\end{equation}
+A covariance-aware GLS variant (structured $\Sigma_\tau=A\,\mathrm{diag}(u)A^{T}$)
+is tighter still but its per-channel variance fit degrades on wide-$D$ grids; we
+use the star bound as the robust overlay.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.9\linewidth]{F1_rmse_vs_snr.png}
-\caption{RMSE vs SNR at three bandwidths ($12$ channels) using a \emph{filtered}
-pair pool ($D\!\ge\!0.25\max D$). Equal-weight averaging (circles),
-$D^2$-weighting (squares) and robust (diamonds) coincide on the CRB (dashed,
-ratio $\approx\!1.0$--$1.1$): once uninformative pairs are removed the combiner
-is irrelevant.}
-\label{fig:money}
+\includegraphics[width=0.95\linewidth]{F1_estimators_compare.png}
+\caption{RMSE vs SNR at three bandwidths (15 channels, robust pool) for the
+parabolic and GCC-PHAT estimators, with the star CRB (dashed). The two
+estimators \emph{cross}: parabolic has a lower threshold, GCC-PHAT a lower
+high-SNR floor (no bias). See Sec.~\ref{sec:estimators}.}
+\label{fig:estimators}
 \end{figure}
 
-\textbf{Pair selection attains the CRB} (Fig.~\ref{fig:money}). On the filtered
-pool the three combiners are indistinguishable and all lie on the CRB. The
-essential step is therefore the \emph{selection} of pairs, not the weighting.
+\section{Multi-channel fusion}
+\label{sec:fusion}
+From one estimate per channel pair, the distance is a weighted mean
+$\hat Z=\sum_{ij}w_{ij}\hat Z_{ij}/\sum_{ij}w_{ij}$. We consider:
+\begin{itemize}\setlength\itemsep{1pt}
+\item \textbf{Equal}: $w_{ij}=1$ (naive).
+\item \textbf{Dispersion-weighted}: $w_{ij}=D_{ij}^2$ --- the minimum-variance
+weight, because $\sigma_{Z,ij}\propto 1/D_{ij}$ when the per-pair CRB is common.
+\item \textbf{Robust}: $w_{ij}=D_{ij}^2\,\psi(r_{ij})$ with a Tukey-bisquare
+$\psi(r)=[1-(r/(c s))^2]^2$ on residuals $r_{ij}=|\hat Z_{ij}-\med\hat Z|$,
+$s=\mathrm{IQR}$, which down-weights threshold-region outliers.
+\end{itemize}
+All are \textbf{SNR-free}: only the known $D_{ij}$ is required.
+
+\smallskip
+\noindent\textbf{Pair selection.} We restrict the pool to well-separated pairs,
+$D_{ij}\ge \alpha\max_{ij}D_{ij}$, and study the residual value of weighting as
+$\alpha$ grows (Fig.~\ref{fig:alpha}).
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{F7_pool_effect.png}
-\caption{Why selection matters. Left: RMSE vs SNR ($12$ ch) for equal-weight
-averaging over \emph{all} pairs (circles) versus a \emph{filtered pool}
-($D\!\ge\!0.25\max D$, squares); on the pool, equal averaging, $D^2$ and robust
-all coincide on the CRB. Right: the SNR penalty of fusing all pairs is
-$\sim\!30$\,dB and vanishes ($\approx 0$) after filtering --- dispersion
-weighting is the soft-filter equivalent of the threshold.}
+\caption{Pair selection is the essential step (12-channel band-edge grid).
+Left: RMSE vs SNR for equal-weight averaging over \emph{all} pairs (circles)
+versus a \emph{filtered pool} ($D\ge0.25\max D$, squares); on the pool, equal
+averaging, $D^2$ and robust all coincide on the CRB. Right: the SNR penalty of
+fusing all pairs ($\sim\!30$\,dB) vanishes after filtering. Dispersion weighting
+is the soft-filter equivalent of the threshold.}
 \label{fig:pool}
 \end{figure}
 
-\textbf{Uninformative pairs destroy naive fusion} (Fig.~\ref{fig:pool}). Fusing
-\emph{all} pairs, the equal average stays $10$--$10^{3}\times$ above the CRB:
-from Eq.~(2), $\sigma_{Z,ij}\!\propto\!1/D_{ij}$, so low-separation pairs carry
-almost no information yet dominate an equal-weight mean. Restricting to
-well-separated pairs removes them and the average drops onto the CRB; the
-residual benefit of weighting is then $\approx 0$\,dB. Weighting and hard
-filtering are thus two implementations of the same idea --- discard
-low-separation pairs --- which makes the recipe calibration-free and robust to
-the exact combining rule.
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.9\linewidth]{F8_alpha_sweep.png}
+\caption{Weighting benefit versus filter threshold $\alpha$
+($D\ge\alpha\max D$; $\alpha=0$ = all pairs), per channel count, on the
+\emph{equispaced} grid. The benefit is real but modest ($\sim$3--5\,dB at
+$\alpha=0$, largest for more channels) and is largely removed by filtering.}
+\label{fig:alpha}
+\end{figure}
 
-\textbf{Design rules.} (i)~At high SNR the RMSE scales as $1/(\sqrt{\SNR}\,B)$
-(Eq.~(2)), so the perturbation \emph{bandwidth is as fundamental as SNR}.
-(ii)~The SNR penalty of fusing \emph{all} pairs, relative to selecting a
-well-separated pool, is $\sim$28--35\,dB, and is largest for few channels.
-(iii)~The SNR required to reach RMSE$\,=5\,$km falls monotonically with the
-number of channels ($\sim$62--67\,dB for the selected pool versus
-$\sim$92--100\,dB for all-pairs averaging). (iv)~Averaging $N$ independent fibres
-lowers the RMSE as $1/\sqrt{N}$, independently of the fusion rule. (v)~The robust
-rule departs from the CRB only in the threshold region, reducing heavy-tail
-error. These curves are provided as supplementary material.
+\section{Delay estimators}
+\label{sec:estimators}
+For each pair we estimate the delay from the 2-D cross-correlation. Two
+estimators matter:
+
+\smallskip
+\noindent\textbf{Parabolic peak.} The magnitude cross-correlation peak is refined
+by a three-point parabola. It is \emph{variance-optimal} in the CRB regime but,
+for an asymmetric peak (channels with different PMD), it carries a systematic
+\emph{bias} that grows as $B$ falls.
+
+\smallskip
+\noindent\textbf{GCC-PHAT.} Phase-transform generalised cross-correlation with a
+bandwidth mask; its peak is sharper and its delay estimate is essentially
+\emph{unbiased} for a pure delay, at the cost of higher variance.
+
+\smallskip
+\noindent The measured trade-off (15 ch, robust pool, RMSE in km) is summarised
+in Table~\ref{tab:est} and Fig.~\ref{fig:estimators}. At 22\,kHz/100\,dB the
+unbiased GCC-PHAT is $3.7\times$ more accurate; at 1.3\,kHz/76\,dB the
+lower-variance parabolic wins. The choice is therefore \emph{regime-dependent}.
+
+\begin{table}[t]
+\centering\caption{RMSE (km), robust pool, parabolic vs GCC-PHAT.}
+\begin{tabular}{lccccc}
+\toprule
+& \multicolumn{2}{c}{22\,kHz, 100\,dB} & \multicolumn{2}{c}{1.3\,kHz, 76\,dB} & 2\,MHz, 100\,dB\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-6}
+count & parab & GCC & parab & GCC & parab / GCC\\
+\midrule
+10 ch & 2.65 & \textbf{0.73} & \textbf{30.5} & 61.8 & 0.035 / \textbf{0.006}\\
+15 ch & 2.64 & \textbf{0.71} & \textbf{25.8} & 52.3 & 0.035 / \textbf{0.004}\\
+\bottomrule
+\end{tabular}
+\label{tab:est}
+\end{table}
+
+\section{Simulation setup}
+\label{sec:setup}
+We simulate $10$ independent PMD fibres. Two channel grids are studied: a
+\emph{band-edge} selection (extremes first) and a realistic \emph{equispaced}
+grid (custom 30-channel master over 184--196\,THz, uniform subsets of
+$\{5,10,15\}$ channels). Sweeps: bandwidth
+$B\!\in\![0.2,2000]\,$kHz (log) and energy SNR $\in[15,100]\,$dB, $100$ noise
+realisations per cell. Delay estimation uses parabolic interpolation or
+GCC-PHAT; distances are combined with the rules of Sec.~\ref{sec:fusion}.
+
+\section{Results}
+\label{sec:results}
+\textbf{The bound is attainable at the pair level.} The empirical per-pair
+delay std matches the theoretical CRB to within $\sim\!10\%$ (ratio
+$1.08$--$1.11$), confirming Eq.~\eqref{eq:crb}. On the combined estimate, the
+star bound is coherent (simulation above it everywhere), whereas the naive
+combination is optimistic.
+
+\textbf{Selection dominates weighting} (Fig.~\ref{fig:pool}). Equal-weight
+averaging over all pairs is $10$--$10^3\times$ above the CRB; on a filtered pool
+the combiners coincide on the bound. On the equispaced grid the weighting
+benefit is a few dB at $\alpha=0$ and shrinks with filtering
+(Fig.~\ref{fig:alpha}).
+
+\textbf{Robust fusion is best on the equispaced grid.} High-SNR RMSE (averaged
+over bandwidth) for 15 ch: equal $6.60$, $D^2$ $6.25$, robust $\mathbf{5.48}$\,km
+(CRB $2.39$); robust wins in $>$90\% of cells. On the band-edge grid the pool is
+nearly homogeneous and the three rules coincide.
+
+\textbf{Estimator bias limits high SNR} (Fig.~\ref{fig:estimators},
+Table~\ref{tab:est}). The parabolic bias ($-2.6$\,km at 22\,kHz) dominates at
+high SNR; GCC-PHAT removes it, at the price of an earlier threshold.
+
+\textbf{Scaling laws.} (i) At high SNR $\mathrm{RMSE}\propto1/(\sqrt{\SNR}\,B)$
+(Fig.~\ref{fig:estimators}). (ii) More channels lower the RMSE and the SNR
+required to reach a target (Fig.~\ref{fig:design}). (iii) Averaging $N$
+independent fibres reduces the RMSE as $1/\sqrt{N}$.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{F6_gap_to_crb.png}
+\caption{Bias/variance decomposition (15 ch, GCC-PHAT). Left: RMSE/CRB (solid)
+and std/CRB (dotted). The variance sits at/below the CRB, while RMSE rises at
+high SNR because the \emph{bias} dominates --- motivating the unbiased estimator
+of Sec.~\ref{sec:estimators}. Right: $|$bias$|$ vs SNR.}
+\label{fig:biasvar}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{F4_db_gain_vs_channels.png}
+\caption{Design curve: SNR required to reach RMSE $=5$\,km versus channel count
+(lower is better), with the star CRB.}
+\label{fig:design}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.9\linewidth]{F5_error_distributions.png}
+\caption{ECDF of $|$error$|$ at a threshold cell; the robust combiner has the
+fewest large errors.}
+\label{fig:ecdf}
+\end{figure}
+
+\section{Discussion and design rules}
+\label{sec:discussion}
+From the results, a practical recipe:
+\begin{enumerate}\setlength\itemsep{1pt}
+\item \textbf{Select well-separated channel pairs} (large $|D_{ij}|$); this is
+the dominant lever, and dispersion weighting is its soft-filter equivalent.
+\item \textbf{Fuse with a robust (bisquare) combiner} --- it is never worse than
+equal or $D^2$ weighting and is best on a realistic equispaced grid.
+\item \textbf{Choose the delay estimator by regime}: parabolic at low SNR or low
+bandwidth (variance-limited); GCC-PHAT at high SNR / high bandwidth
+(bias-limited). A bias-corrected parabolic would combine both advantages.
+\item Budget for the fundamental limits: precision improves as
+$1/(\sqrt{\SNR}\,B)$ and as more channels / fibres are averaged.
+\end{enumerate}
+\textbf{Limitations.} The study is simulation-only; it assumes a single
+perturbation and a static dispersion curve. The parabolic bias is a property of
+the interpolator and is not corrected here; we present it as a trade-off.
 
 \section{Conclusion}
+\label{sec:conclusion}
 We derived and validated the effective-SNR CRB for CD-based transient
-localisation and showed that the essential step is \emph{pair selection}: fusing
-\emph{all} channel pairs is dominated by uninformative small-separation pairs,
-whereas restricting to well-separated pairs attains the bound regardless of the
-combining rule --- dispersion weighting being the soft-filter equivalent. The
-scheme needs no SNR knowledge, so it is directly deployable, and because the
-bound scales as $1/(\sqrt{\SNR}\,B)$, slow perturbations are the hard case.
-Future work: experimental validation, covariance-aware fusion, and optimisation
-of the channel-selection scheme.
+localisation and studied the three levers that decide whether a real estimator
+reaches it: pair selection (essential), robust fusion (best on a realistic
+grid), and the delay estimator (a bias/variance trade-off --- parabolic at low
+SNR/low bandwidth, GCC-PHAT at high SNR/high bandwidth). The recipe needs no SNR
+knowledge, so it is directly deployable. Future work: experimental validation,
+bias-corrected peak estimation, and optimisation of the channel-selection
+scheme.
 
 \begin{thebibliography}{9}
 \bibitem{taylor1993das} H.~F. Taylor and C.~E. Lee, ``Apparatus and method for
@@ -221,6 +424,9 @@ Signal Processing} (2003), pp.~266--271.
 \bibitem{weiss1983} A.~J. Weiss and E.~Weinstein, ``Fundamental limitations in
 passive time-delay estimation---Part I,'' IEEE Trans. Acoust. Speech Signal
 Process. \textbf{31}(2), 472--486 (1983).
+\bibitem{knapp1976} C.~Knapp and G.~Carter, ``The generalized correlation method
+for estimation of time delay,'' IEEE Trans. Acoust. Speech Signal Process.
+\textbf{24}(4), 320--327 (1976).
 \bibitem{gisin1992} N.~Gisin and J.~P. Pellaux, ``Polarization mode dispersion:
 time versus frequency domains,'' Opt. Commun. \textbf{89}(2--4), 316--323 (1992).
 \end{thebibliography}
@@ -228,124 +434,86 @@ time versus frequency domains,'' Opt. Commun. \textbf{89}(2--4), 316--323 (1992)
 \clearpage
 \appendix
 \section{Equation reference (working notes --- not for submission)}
-\noindent This page collects every relation used in the study, with a short
-explanation of each. Units are indicated.
+\noindent Every relation used in the study, with units.
 
 \smallskip
-\noindent\textbf{1) Chromatic-dispersion delay and distance.}
+\noindent\textbf{1) CD delay and distance.}
 \begin{equation}
-\tau_{ij}=Z\,D_{ij},\qquad
-D_{ij}=\int_{\lambda_j}^{\lambda_i}\!(D_0+S_0(\lambda-\lambda_0))\,d\lambda,
-\qquad \hat Z_{ij}=\hat\tau_{ij}/D_{ij}.
+\tau_{ij}=Z\,D_{ij},\quad
+D_{ij}=\int_{\lambda_j}^{\lambda_i}(D_0+S_0(\lambda-\lambda_0))\,d\lambda,\quad
+\hat Z_{ij}=\hat\tau_{ij}/D_{ij}.
 \end{equation}
-$D(\lambda)$ is the dispersion curve [ps/(nm\,km)], $D_{ij}=|\!\int D\,d\lambda|$
-[ps/km], $Z$ [km], $\tau_{ij}$ [s]; the estimate inverts the known dispersion
-integral.
 
 \smallskip
 \noindent\textbf{2) Energy SNR and target noise.}
 \begin{equation}
 \SNR=\frac{E}{N_0}=\frac{\sum_n x[n]^2}{\sigma^2},\qquad
-\sigma^2=\frac{\sum_n x[n]^2}{\SNR_{\rm lin}} \quad (N_0=\sigma^2\,dt).
+\sigma^2=\frac{\sum_n x[n]^2}{\SNR_{\rm lin}}\quad(N_0=\sigma^2 dt).
 \end{equation}
-$E=\int x^2 dt$ is signal energy, $N_0$ the two-sided noise PSD; the last form
-sets the per-component noise variance for a target SNR.
 
 \smallskip
 \noindent\textbf{3) Mean-square bandwidth.}
 \begin{equation}
-\beta^2=\frac{\int (2\pi f)^2|S(f)|^2\,df}{\int|S(f)|^2\,df}
-=\frac{\sum_k (2\pi f_k)^2|X_k|^2}{\sum_k |X_k|^2}.
+\beta^2=\frac{\sum_k(2\pi f_k)^2|X_k|^2}{\sum_k|X_k|^2}.
 \end{equation}
-$S(f)$ is the signal spectrum; $\beta$ is the RMS bandwidth that sets the
-delay precision.
 
 \smallskip
-\noindent\textbf{4) Deterministic (known-signal) CRB.}
+\noindent\textbf{4) Deterministic CRB.}
 \begin{equation}
-\CRB_{\det}(\tau)=\frac{1}{\SNR\,\beta^2}.
+\CRB_{\det}(\tau)=1/(\SNR\,\beta^2).
 \end{equation}
-The single-sensor ideal bound; the two-sensor effective bound sits a factor
-$\sim\!2$ above it at high SNR (reference-noise penalty).
 
 \smallskip
 \noindent\textbf{5) Two-sensor effective SNR.}
 \begin{equation}
 \SNReff(f)=\frac{(S/N_1)(S/N_2)}{1+S/N_1+S/N_2},\qquad
-\SNReff=\frac{\rho^2}{1+2\rho}\ \ (\text{equal},\ \rho=S/N_0).
+\SNReff=\rho^2/(1+2\rho).
 \end{equation}
-Combines the two sensors' SNRs \emph{before} cross-correlation; it is not the
-correlator-output SNR.
 
 \smallskip
 \noindent\textbf{6) Fisher information and delay CRB.}
 \begin{equation}
 J_{ij}=\sum_k \omega_k^2\,\SNReff(f_k),\qquad
 \CRB(\tau_{ij})=1/J_{ij},\qquad
-\sigma_{Z,ij}=\sqrt{\CRB(\tau_{ij})}\,\frac{1}{D_{ij}}.
+\sigma_{Z,ij}=\sqrt{\CRB(\tau_{ij})}/D_{ij}.
 \end{equation}
-Discrete one-sided sum ($\omega_k=2\pi f_k$); the last relation maps delay
-variance [s$^2$] to distance std [km] (with $D_{ij}$ in ps/km and $1\leftrightarrow10^{12}$ ps/s).
 
 \smallskip
 \noindent\textbf{7) Per-channel variance model.}
 \begin{equation}
-\Var(\tau_{ij})=u_i+u_j,\qquad u_k=1/J_k,
+\Var(\tau_{ij})=u_i+u_j,\qquad u_k=1/J_k.
 \end{equation}
-with $J_k$ the single-channel Fisher information. Additivity of the pairwise
-variance in the per-channel terms motivates the $D^2$ weighting.
 
 \smallskip
 \noindent\textbf{8) Fusion estimators (SNR-free).}
 \begin{equation}
-\hat Z^{\rm avg}\!=\!\frac1{n_p}\!\sum_{ij}\!\hat Z_{ij},\quad
-\hat Z^{D^2}\!=\!\frac{\sum_{ij}D_{ij}^2\hat Z_{ij}}{\sum_{ij}D_{ij}^2},\quad
+\hat Z^{\rm avg}=\frac1{n_p}\!\sum_{ij}\hat Z_{ij},\quad
+\hat Z^{D^2}=\frac{\sum_{ij}D_{ij}^2\hat Z_{ij}}{\sum_{ij}D_{ij}^2},\quad
 w_{ij}=D_{ij}^2\,\psi(r_{ij}).
 \end{equation}
-$\psi$ is the Tukey-bisquare; the second rule is inverse-variance weighting when
-$\sigma_{Z,ij}\!\propto\!1/D_{ij}$.
 
 \smallskip
 \noindent\textbf{9) Tukey-bisquare robust weight.}
 \begin{equation}
-\psi(r)=\Bigl[1-\bigl(r/(c\,s)\bigr)^2\Bigr]^2\ \ (|r|<c\,s),\quad 0\ \text{otherwise},
-\qquad r_{ij}=|\hat Z_{ij}-\med\hat Z|,\ s=\mathrm{IQR}.
+\psi(r)=[1-(r/(c s))^2]^2\ \ (|r|<cs),\quad 0\ \text{otherwise},\quad
+r_{ij}=|\hat Z_{ij}-\med\hat Z|,\ s=\mathrm{IQR}.
 \end{equation}
-Smooth down-weighting of outliers; $c\!\approx\!2.5$ with $s\!=\!1.5\,\mathrm{IQR}$
-(cutoff $\approx3.75\,$IQR) is used here.
 
 \smallskip
-\noindent\textbf{10) Correlation-aware (GLS) combination.}
+\noindent\textbf{10) Star and GLS combination.}
 \begin{equation}
-\Sigma_\tau=A\,\mathrm{diag}(u)\,A^{T},\qquad
-\Sigma_Z=\mathrm{diag}(1/D)\,\Sigma_\tau\,\mathrm{diag}(1/D),\qquad
-w=\Sigma_Z^{+}\mathbf 1,\qquad
-\Var(\hat Z)=\frac{1}{\mathbf 1^{T}\Sigma_Z^{+}\mathbf 1}.
-\end{equation}
-$A$ is the signed incidence matrix of the pairs ($A_{k,i}=+1,\,A_{k,j}=-1$);
-$\Sigma_\tau$ has rank $n_{\rm ch}-1$, encoding the fact that only $n_{\rm ch}-1$
-delays are independent. This is the covariance-optimal fusion.
-
-\smallskip
-\noindent\textbf{11) Combined CRB and scaling.}
-\begin{equation}
-\sigma_{Z,\rm comb}=\Bigl[\sum_{ij} D_{ij}^2/\bigl(\CRB(\tau_{ij})\cdot10^{24}\bigr)\Bigr]^{-1/2},
+\sigma_{Z,\rm star}=\Bigl[\max_r\sum_{k\neq r}D_{rk}^2/(\CRB(\tau_{rk})10^{24})\Bigr]^{-1/2},
 \qquad
-\sigma_Z \propto \frac{1}{\sqrt{\SNR}\,\beta}\xrightarrow{\beta\propto B}\frac{1}{\sqrt{\SNR}\,B},
-\qquad
-\sigma_Z\propto \frac{1}{\sqrt{N_{\rm fib}}}.
+\Sigma_\tau=A\,\mathrm{diag}(u)A^{T},\ w=\Sigma_Z^{+}\mathbf 1.
 \end{equation}
-The first is inverse-variance combination of pair CRBs; the last two are the
-high-SNR and multi-fibre scaling laws.
 
 \smallskip
-\noindent\textbf{12) Performance metrics.}
+\noindent\textbf{11) Scaling and metrics.}
 \begin{equation}
+\sigma_Z\propto\frac{1}{\sqrt{\SNR}\,\beta},\quad
+\sigma_Z\propto\frac{1}{\sqrt{N_{\rm fib}}},\quad
 \mathrm{RMSE}=\sqrt{\tfrac1M\textstyle\sum_m(\hat Z_m-Z)^2},\quad
-\mathrm{bias}=\tfrac1M\textstyle\sum_m(\hat Z_m-Z),\quad
-\mathrm{success}=\tfrac1M\#\{|\hat Z_m-Z|\le \epsilon\}.
+\MSE=\mathrm{bias}^2+\mathrm{std}^2.
 \end{equation}
-$\mathrm{MSE}=\mathrm{bias}^2+\mathrm{std}^2$; $\epsilon$ is the localisation
-tolerance (here $1\%$ of $Z$). Reported over all fibres and realisations.
 
 \end{document}
