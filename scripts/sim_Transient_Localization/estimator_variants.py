@@ -83,8 +83,9 @@ def main(config_path, count=15, n_bw=3, snrs=(40, 60, 80, 100),
     BW = meta["BANDWIDTHS"]
     bw_idx = [int(len(BW) * f) for f in (0.2, 0.5, 0.8)][:n_bw]
     event = float(meta["event_distance_km"])
-    fmax_factor = float(cfg["phat"]["fmax_factor"])
-    mag = float(cfg["phat"]["mag_threshold"])
+    phat = cfg.get("phat", {})
+    fmax_factor = float(phat.get("fmax_factor", 2.0))
+    mag = float(phat.get("mag_threshold", 0.05))
 
     print("count=%d  pairs=%d  true Z=%.1f km" % (count, len(pairs), event))
     for ib in bw_idx:
