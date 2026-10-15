@@ -5,14 +5,19 @@ chromatic-dispersion (CD) localisation over WDM links, using the **2-D SOP**
 signal with parabolic interpolation after rotating the centroid to the north
 pole.
 
-It reproduces exactly the definitions in
+It reproduces the definitions in
 `Cramér–Rao Bound (CRB) for Time-Delay Estimation — Simple Summary.md`:
 energy SNR `E/N0`, mean-square bandwidth `beta^2`, and the two-sensor
 **effective SNR**.
 
+> **Status:** two production datasets exist — the **band-edge** run
+> (`results_crb_full_pairs`) and the **equispaced** run
+> (`results_crb_equispaced`). The equispaced run is the current focus. The
+> `paper/` draft is frozen for now (do not edit its narrative).
+
 ---
 
-## 1. Definitions implemented (`crb.py`)
+## 1. Definitions (`crb.py`)
 
 | Quantity | Formula | Code |
 |---|---|---|
@@ -25,12 +30,15 @@ energy SNR `E/N0`, mean-square bandwidth `beta^2`, and the two-sensor
 | Distance mapping | `sigma_Z = sqrt(CRB_tau) * 1e12 / |int D dlambda|` | `crb_distance` |
 | Pair combination | inverse-variance (naive), **star**, covariance-aware **GLS** | `combined_crb_distance`, `star_combined_crb_distance`, `gls_combined_crb_distance` |
 
-Notes:
 * `P_coh(f) = | sum_c X_i,c(f) conj(X_j,c(f)) |` is the **coherent
-  cross-spectrum** used as the common signal.
-* Each component contributes its own Fisher information (summed).
-* Validated against Monte-Carlo: the parabolic correlator saturates the
-  effective bound at high SNR (real pair `MC/CRB_eff ~ 1.07`).
+  cross-spectrum** (common-signal estimate).
+* **Per-pair CRB validated**: empirical pair std / theoretical CRB ≈ **1.08–1.11**
+  (equispaced) and **1.02** (production). The pair-level model is correct.
+* **Combined bound — use the STAR bound, not GLS.** The GLS fits a per-channel
+  additive variance model (`Var(τ_ij)=u_i+u_j`); on **wide-`D`-spread grids**
+  (equispaced) the fit degrades and GLS can exceed the star bound (0.80 vs
+  0.30) — impossible. `estimator_comparison.py` now uses
+  `crb.star_combined_crb_distance` and stores `crb_star`.
 
 ---
 
@@ -39,171 +47,149 @@ Notes:
 | File | Role |
 |---|---|
 | `crb.py` | CRB definitions (pure functions). |
-| `channel_selection.py` | WDM subset schemes: alternating / uniform / extremes / first_n. |
-| `generate_jones_crb.py` | Jones generator — **batched** closed-form SU(2) tree-product (`propagate_channels`), ~30× faster than the per-sample loop. Supports full ITU grid **and custom uniformly-spaced** grids. |
-| `process_crb_sweep.py` | 2-D SOP, energy-SNR noise, parabolic estimator, stores per-realisation estimates (all-pairs **and** pool variants) + CRB arrays (+ per-pair distances). **Checkpointed per fibre.** `CRB_N_JOBS` env overrides `run.n_jobs`. |
-| `analyse_crb_sweep.py` | std/bias heatmaps with GLS CRB overlay, std-vs-SNR, estimator comparison, multi-fibre and cross-count plots. |
-| `estimator_comparison.py` | SNR-free fusion study → publication figures **F1–F8**, plus `estcomp_<n>ch.npz`. Supports `--replot` (rebuild figures from `estcomp` in seconds, no recompute). |
-| `validate_crb.py` | Toy + identity validation of the bounds. |
-| `validate_gls.py` | Naive vs GLS vs star combination validation (needs per-pair data). |
-| `compare_filters.py` | no-filter vs low-pass vs band-pass comparison. |
+| `channel_selection.py` | Subset schemes: alternating / uniform / extremes / first_n. |
+| `generate_jones_crb.py` | Batched Jones generator (~30× faster). Supports **full ITU grid and custom uniformly-spaced grids**. |
+| `process_crb_sweep.py` | 2-D SOP, energy-SNR noise, parabolic estimator, stores per-realisation estimates (all-pairs + pool) + CRB arrays (+ `pair_Z`). Checkpointed per fibre. `CRB_N_JOBS` overrides `run.n_jobs`. |
+| `analyse_crb_sweep.py` | std/bias heatmaps + CRB overlay, std-vs-SNR, cross-count plots. |
+| `estimator_comparison.py` | SNR-free fusion study → figures **F1–F8** + `estcomp_<n>ch.npz`. `--replot` rebuilds figures in seconds from `estcomp`. |
+| `estimator_variants.py` | **Controlled estimator test** (parabolic / phase-slope / GCC-PHAT / signed) — reports bias ± std per SNR. |
+| `estimator_variants.slurm` | SLURM driver for the above (`$1`=config, `$2`=count). |
+| `prototype_peak_bias.py` | Toy test of interpolation bias (symmetric Gaussian). |
+| `validate_crb.py`, `validate_gls.py`, `compare_filters.py` | Bounds, GLS/star, filter comparisons. |
 | `run_crb_hpc.sh` | SLURM driver (config as `$1`): generate → process → analyse. |
 | `estimator_comparison.slurm` | SLURM driver for the figure job (`$1` = run dir). |
 
-Configs:
-* `sweep_config_crb_test.yaml` (+ `_test_lowpass`, `_test_bandpass`) — small tests.
-* `sweep_config_crb_mid.yaml` — 5 fibres, 30×30, counts {4,8,12}.
-* `sweep_config_crb.yaml` — **production** (full ITU grid, 40×40, counts {4,6,8,10,12}, `save_pairs: none`).
-* `sweep_config_crb_pairs.yaml` — production grids, `save_pairs: all` (estimator study).
-* `sweep_config_crb_equispaced.yaml` — **current** study: custom 30-channel equispaced grid, uniform selection, counts {5,10,15}, 10 fibres, 100 real, 50×50, `save_pairs: all`.
+Configs: `sweep_config_crb_test*.yaml` (tests), `sweep_config_crb_mid.yaml`,
+`sweep_config_crb.yaml` (production, full grid), `sweep_config_crb_pairs.yaml`
+(production + `save_pairs: all`), **`sweep_config_crb_equispaced.yaml`** (current:
+custom 30-ch equispaced, uniform {5,10,15}, 10 fibres, 100 real, 50×50,
+`save_pairs: all`).
 
 ---
 
 ## 3. How to run
 
 ```bash
-python validate_crb.py                                  # bound validation
-python generate_jones_crb.py  <config>                  # stage 1 (skip if Jones exists)
-python process_crb_sweep.py   <config>                  # stage 2 (checkpointed)
-python analyse_crb_sweep.py   <config>                  # stage 3 (heatmaps)
-python estimator_comparison.py <run_dir> [--replot]     # F1–F8
+python validate_crb.py
+python generate_jones_crb.py  <config>
+python process_crb_sweep.py   <config>          # checkpointed per fibre
+python analyse_crb_sweep.py   <config>
+python estimator_comparison.py <run_dir> [--replot]
+python estimator_variants.py  <config> <count>  # via estimator_variants.slurm
+```
+
+HPC (SLURM, conda `phd_env`):
+```bash
+sbatch run_crb_hpc.sh <config>                         # simulate
+sbatch --dependency=afterok:<sim> estimator_comparison.slurm <run_dir>   # figures
+sbatch estimator_variants.slurm <config> <count>       # estimator test
 ```
 
 ---
 
-## 4. Raw data saved (`crb_results_<n>ch.npz`)
+## 4. Raw data (`crb_results_<n>ch.npz`)
 
-Metadata: `BANDWIDTHS`, `SNRS_dB`, `SNRS_lin`, `channel_indices_full/local`,
-`wavelengths_nm`, `pair_indices`, `D_abs`, `event_distance_km`,
-`filter_mode`, `filter_params`, `cfg`.
+Metadata (`BANDWIDTHS`, `SNRS_dB`, `channel_indices_*`, `wavelengths_nm`,
+`pair_indices`, `D_abs`, `event_distance_km`, `filter_mode`, `cfg`), per-cell
+estimates (`est_crb`, `est_gls`, `est_lambda`, `est_crb_iqr`), CRB arrays
+(`crb_delay_pairs`, `crb_dist_pairs`, `crb_dist_combined_*`), `sigma2`,
+`beta2`, `energy`, and (with `save_pairs: all`) `pair_Z`.
 
-Per (fibre, bw, snr, real): `est_crb`, `est_gls`, `est_lambda`, `est_crb_iqr`.
-Per (fibre, bw, snr): `crb_delay_pairs`, `crb_dist_pairs`,
-`crb_dist_combined_eff`, `crb_dist_combined_det`, `crb_dist_combined_gls`,
-`sigma2`.
-Per (fibre, bw, channel): `beta2`, `energy`.
-Optional: `pair_Z` (all per-pair distances) when `output.save_pairs: "all"`.
-
-`estimator_comparison.py` writes `estcomp_<n>ch.npz`: per-realisation estimates
-for the all-pairs and pool estimators, RMSE/bias/std/MAE/success surfaces, the
-GLS bound, and the `alpha_saving` sweep — so figures rebuild without recompute.
+`estcomp_<n>ch.npz`: per-realisation estimates (all-pairs + **pool** +
+`--replot` surfaces), `crb_star`, and the `alpha_saving` sweep.
 
 ---
 
 ## 5. Findings
 
-* **CRB attained.** The parabolic correlator saturates the effective bound at
-  high SNR (`MC/CRB_eff ~ 1.07`) in all-pairs fusion.
-* **Naive all-pairs fusion fails.** Over *all* channel pairs, equal-weight
-  averaging sits `10`–`10^3`× above the CRB: since `sigma_Z ∝ 1/D`, pairs with
-  small dispersion separation `D` carry almost no information yet dominate an
-  equal-weight mean.
-* **Pair selection ≡ weighting.** On a *filtered* pool (`D ≥ 0.25 max D`) the
-  retained pairs have near-equal precision, so **equal averaging, `D^2`-weighting
-  and robust coincide on the CRB**; the residual benefit of weighting is ≈0 dB
-  (Fig. F7). Weighting is the **soft-filter equivalent** of an explicit
-  threshold. → *the essential step is pair selection, not the combining rule.*
-* **Governing quantity.** The weighted-vs-naive gap is set by the **spread of
-  the per-pair variances** in whatever pool is fed to the combiner.
-* **Multi-fibre** averaging follows `1/sqrt(N_fibres)`, rule-independent.
-* **Filtering** (linear) does not move the CRB (S/N invariant); low-pass ≈ none,
-  band-pass worse (discards low-frequency transient energy).
-* Naive all-pairs inverse-variance over-counts pair information by
-  `1.5× (4ch) / 2.0× (8ch) / 2.6× (12ch)`; star/GLS are tight (`1.0–1.1`).
+**Bounds**
+* Per-pair CRB is accurate (empirical/theory ≈ 1.1).
+* Use the **star** combined bound; GLS is unreliable for wide-`D` grids.
+
+**Band-edge (extremes-first) grid — production, 12 ch**
+* Naive all-pairs averaging is `10–10^3×` above the CRB (small-`D` pairs
+  dominate). On a **filtered pool** (`D ≥ 0.25 max D`), equal / `D²` / robust
+  **coincide** on the CRB → *weighting ≡ selection* there.
+
+**Equispaced grid — current**
+* **Robust (bisquare) is the best combiner.** High-SNR RMSE (averaged over BW):
+
+  | count | average | `D²` | **robust** | CRB(star) |
+  |---|---|---|---|---|
+  | 5 ch | 10.38 | 9.74 | **9.35** | 4.73 |
+  | 10 ch | 8.42 | 7.97 | **6.29** | 3.01 |
+  | 15 ch | 6.60 | 6.25 | **5.48** | 2.39 |
+
+  Robust wins the RMSE in **510–551 / 600** cells; ~10–25 % lower RMSE than
+  plain averaging at mid SNR; comparable bias. **Robust separates from the
+  others here** (unlike the band-edge grid) because the pool retains a range of
+  precision and outliers.
+* **Weighting benefit vs filter threshold (F8):** at α = 0 (all pairs) ≈
+  **2.9 dB (10 ch), 3.6 dB (5 ch), 4.8 dB (15 ch)** — nonzero, **grows with
+  channel count**, but modest (the closest equispaced pairs are 414 GHz apart,
+  `D ≈ 70 ps/km`, vs 8 ps/km for adjacent ITU channels). Filtering (α ≳ 0.3)
+  removes most of it.
+* **Variance** is ~2–2.5× the star CRB at high BW/SNR.
+* **Bias is bandwidth-dependent**: negligible at high `B` (~−0.04 km at 2 MHz),
+  ~−2 km at ~22 kHz. The high-SNR floor is a **low-bandwidth** effect
+  (sub-sample interpolation on coarse `dt`).
+* Multi-fibre averaging follows `1/sqrt(N_fibres)`.
+* Linear filtering does not move the CRB.
 
 ---
 
-## 6. Open hypothesis — equally-spaced-grid study (current)
+## 6. Open items / handoff for the next session
 
-**Motivation.** The "weighting is irrelevant once filtered" result was obtained
-with the **extremes-first** selection, which makes small channel sets
-**bimodal**: a few cross-band pairs (`D ≈ 2000 ps/km`) and a few adjacent
-edge pairs (`D ≈ 10 ps/km`). Filtering (`D ≥ 0.25 max D`) then keeps only the
-near-full-band pairs, whose `D` are almost equal — hence weighting adds nothing.
+**In flight**
+* `estimator_variants.slurm` (parabolic / phase-slope / GCC-PHAT / **signed**)
+  is being run to decide the estimator. Goal: find one with **low bias *and*
+  low std**. Prior knowledge: **phase-slope is unbiased but high-variance**.
 
-**Hypothesis.** On an **equally-spaced** grid the pair separations span a broad
-range (`1Δ, 2Δ, …, (N−1)Δ`), so:
-1. **All-pairs fusion:** weighting should beat naive averaging by a large,
-   channel-count-dependent margin (the "weighting matters" result);
-2. **Filtered pool:** a *residual* weighting gain should remain (≈ few dB),
-   because the retained separations still span a factor ~4, unlike the
-   band-edge case where the spread collapses to ~0.
+**Decisions pending (after `variants_*` tables)**
+1. If a variant (likely **signed**: coherent `corr_x+corr_y` + parabola) has low
+   bias and low std → adopt it, rerun the equispaced grid, and the high-SNR
+   floor drops.
+2. If only phase-slope is unbiased → either apply a **multiplicative bias
+   correction** (~1/(1−0.0046) calibrated per bandwidth) or present the
+   **bias↔variance trade-off as a limitation** (already agreed acceptable).
+3. Make **robust the headline combiner** for the equispaced study, and add a
+   **bias-vs-bandwidth** panel.
 
-If confirmed, the equispaced grid becomes the **definitive** result. If not,
-the "selection ≡ weighting" conclusion is robust across channel-set geometries.
+**Not to touch yet**
+* `paper/` narrative is frozen; update only after the estimator decision.
 
-**Design (`sweep_config_crb_equispaced.yaml`).** Custom **30-channel equispaced**
-master over 184–196 THz; **uniform** selection ⇒ equispaced subsets of
-**{5, 10, 15}** channels; 10 fibres; 100 realisations; 50×50 (SNR × bandwidth);
-`save_pairs: all`.
-
-**New figure F8 — α-sweep.** Weighting benefit vs filter threshold
-`α` (`D ≥ α·max D`; `α = 0` ⇒ all pairs), per channel count. Expectation: on the
-equispaced grid F8 does **not** collapse to ~0 at `α = 0.1–0.3`, and the gain is
-larger for more channels.
-
----
-
-## 7. HPC runs
-
-Production / pairs / equispaced (SLURM; conda env `phd_env`, repo in `~/PhD/…`):
-
+**Recompute needed to refresh figures with the star bound / RMSE panel**
 ```bash
-# simulate (generate -> process -> analyse); RUN_GENERATOR=yes for new Jones
-sbatch run_crb_hpc.sh sweep_config_crb_equispaced.yaml
-
-# figure job (needs pair_Z); chain it after the sim job:
-sbatch --dependency=afterok:<simjob> estimator_comparison.slurm results_crb_equispaced
-```
-
-Stage 2 is **checkpointed per fibre** (resubmit to resume). `CRB_N_JOBS` (default
-`$SLURM_CPUS_PER_TASK`) sets the joblib worker count.
-
----
-
-## 8. Figure catalogue (`results_<run>/figs_estimators/`)
-
-| fig | shows | purpose |
-|---|---|---|
-| **F1** `rmse_vs_snr` | RMSE vs SNR, 3 bandwidths (12 ch) | estimator comparison; pool curves coincide on CRB |
-| **F2** `improvement_maps` | improvement over robust (dB) map + high-SNR diagnostic | where/how much; shows the mid-band dip is a bandwidth effect |
-| **F3** `isoprecision` | SNR saving vs bandwidth, per channel count | value of weighting (all-pairs baseline) |
-| **F4** `db_gain_vs_channels` | SNR for RMSE = 5 km vs channel count | design curve (lower = better) |
-| **F5** `error_distributions` | ECDF of \|error\| | tail behaviour; success at 1 %/5 % tolerance |
-| **F6** `gap_to_crb` | std/CRB and \|bias\| vs SNR | variance efficiency and bias floor |
-| **F7** `pool_effect` | all-pairs vs filtered pool (RMSE; residual saving) | **the "selection vs weighting" result** |
-| **F8** `alpha_sweep` | weighting benefit vs filter threshold α | **current study** — how much of the gain a hard filter recovers |
-
-Regenerate from saved data in seconds (needs `estcomp_*.npz`):
-```bash
-python estimator_comparison.py <run_dir> --replot
+sbatch estimator_comparison.slurm results_crb_equispaced
+sbatch estimator_comparison.slurm results_crb_full_pairs   # optional
 ```
 
 ---
 
-## 9. Paper
+## 7. Figure catalogue (`results_<run>/figs_estimators/`)
 
-`paper/` holds the conference draft (Optica/OFC style, `opticameet3.sty`).
-
-| file | role |
+| fig | shows |
 |---|---|
-| `paper/CRB_transient_localization_optica.tex` | primary draft; title/abstract/intro/results/conclusion reframed to **"pair selection reaches the CRB"**; Fig. 1 (TikZ concept), Fig. 2 = F1, Fig. 3 = F7; equation-reference appendix |
-| `paper/crb_transient_localization_conf.tex` | earlier generic-`article` draft (reference) |
-| `paper/README.md` | build steps and figure provenance |
+| F1 `rmse_vs_snr` | RMSE vs SNR, 3 bandwidths (RMSE, i.e. bias included) |
+| F2 `improvement_maps` | improvement over robust (dB) + high-SNR diagnostic |
+| F3 `isoprecision` | SNR saving vs bandwidth, per channel count |
+| F4 `db_gain_vs_channels` | SNR for RMSE = 5 km vs channel count (design curve) |
+| F5 `error_distributions` | ECDF of \|error\| (1 % / 5 % tolerance lines) |
+| F6 `gap_to_crb` | **RMSE/CRB (solid) + std/CRB (dotted)** and \|bias\| |
+| F7 `pool_effect` | all-pairs vs filtered pool (selection ≡ weighting) |
+| F8 `alpha_sweep` | weighting benefit vs filter threshold α (equispaced) |
 
-Narrative: **uninformative (small-`D`) pairs destroy naive fusion; selecting
-well-separated pairs attains the CRB, and weighting is the soft-filter
-equivalent.** Design rules (SNR↔bandwidth, channel scaling, `1/√N` fibres) given
-in the text.
+Rebuild without recompute: `python estimator_comparison.py <run_dir> --replot`.
 
 ---
 
-## 10. Notes
+## 8. Notes / gotchas
 
-* Noise seeds are **common across bandwidths and SNRs** (seed depends on fibre
-  and realisation), which smooths heatmaps but produces correlated vertical
-  stripes at low SNR.
-* Library uses `from __future__ import annotations` for Python 3.8 compatibility.
-* The **equispaced study may add the all-pairs weighting result** to the paper
-  if F8 confirms the hypothesis (currently the paper leads with the
-  selection-is-key result).
+* **HPC monitoring:** jobs survive SSH drops; re-login and `tail -f
+  crb_sweep_<jobid>.log` / `crb_figs_<jobid>.log` / `crb_variants_<jobid>.log`.
+  Use the **literal** job id (`${JOBID}` only if set in the same shell). Never
+  run heavy Python on the login node — submit via SLURM.
+* Noise seeds are common across bandwidths/SNRs (correlated stripes at low SNR).
+* Library uses `from __future__ import annotations` for Python 3.8.
+* `run_crb_hpc.sh` and `estimator_comparison.slurm` take the config / run dir as
+  `$1`; `estimator_variants.slurm` takes config + count.
