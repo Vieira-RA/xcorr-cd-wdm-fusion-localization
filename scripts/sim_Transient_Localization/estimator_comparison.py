@@ -155,7 +155,10 @@ def metrics(E, Ztrue, tol):
     return dict(rmse=np.sqrt(mse), bias=bias, std=std, mae=mae, success=succ)
 
 
-def gls_bound(d):
+def crb_bound(d):
+    """Achievable combined CRB via the *star* combination (robust: the GLS
+    u-fit is unreliable on wide-D-spread grids, where it can exceed the star
+    bound, which is impossible)."""
     cd = d["crb_delay_pairs"]; D = d["D_abs"]
     pairs = list(d["pair_indices"]); nch = int(d["channel_indices_full"].shape[0])
     nf, nbw, nsnr, _ = cd.shape
@@ -163,8 +166,8 @@ def gls_bound(d):
     for f in range(nf):
         for ib in range(nbw):
             for is_ in range(nsnr):
-                out[f, ib, is_] = crb.gls_combined_crb_distance(
-                    cd[f, ib, is_], D, pairs, nch)[0]
+                out[f, ib, is_] = crb.star_combined_crb_distance(
+                    cd[f, ib, is_], D, pairs, nch)
     return out
 
 
@@ -300,21 +303,23 @@ def fig6_gap(res, counts, BW, SNRS, embed_dir):
     fig, axes = plt.subplots(1, 2, figsize=(15, 5.8))
     for est in PLOT_ESTS:
         mfc = "none" if est == "disp" else COL[est]
-        axes[0].semilogy(SNRS, r["std"][est][ib] / r["crb"][ib],
+        axes[0].semilogy(SNRS, r["rmse"][est][ib] / r["crb"][ib],
                          marker=MARK[est], ms=MSS[est], color=COL[est],
-                         markerfacecolor=mfc, label=LBL[est])
+                         markerfacecolor=mfc, label=LBL[est] + " (RMSE)")
+        axes[0].semilogy(SNRS, r["std"][est][ib] / r["crb"][ib],
+                         ls=":", color=COL[est], lw=1.5)
         axes[1].semilogy(SNRS, np.abs(r["bias"][est][ib]),
                          marker=MARK[est], ms=MSS[est], color=COL[est],
                          markerfacecolor=mfc, label=LBL[est])
-    axes[0].axhline(1.0, color="k", ls="--", lw=1.4, label=r"CRB ($=10^0$)")
-    axes[0].set_ylabel("std / CRB")
-    axes[0].set_title("Variance efficiency (%d ch, B = %.3g kHz)"
+    axes[0].axhline(1.0, color="k", ls="--", lw=1.4, label="CRB")
+    axes[0].set_ylabel("RMSE / CRB (solid);   std / CRB (dotted)")
+    axes[0].set_title("Efficiency incl. bias (%d ch, B = %.3g kHz)"
                       % (key, BW[ib] / 1e3))
     axes[1].set_ylabel("|bias| (km)")
     axes[1].set_title("Bias (%d ch)" % key)
     for a in axes:
         a.set_xlabel("SNR (dB)")
-    axes[0].legend()
+    axes[0].legend(fontsize=11)
     f = os.path.join(embed_dir, "F6_gap_to_crb.png")
     fig.savefig(f); plt.close(fig); return f
 
@@ -396,7 +401,8 @@ def _load_res(run_dir, replot):
                 std={k: d["std_" + k] for k in keys},
                 mae={k: d["mae_" + k] for k in keys},
                 success={k: d["success_" + k] for k in keys},
-                crb=np.nanmean(d["crb_gls"], axis=0))
+                crb=np.nanmean(d["crb_star"] if "crb_star" in d.files
+                               else d["crb_gls"], axis=0))
             if "alpha_saving" in d.files:
                 res[n]["alpha_saving"] = d["alpha_saving"]
             est_keys = [k for k in (ESTS + POOL_ESTS) if ("est_" + k) in d.files]
@@ -420,7 +426,7 @@ def _load_res(run_dir, replot):
 
         est = combine_estimators(d["pair_Z"], D2, kbest)
         surf = {k: metrics(v, Ztrue, tol) for k, v in est.items()}
-        crb_gls = gls_bound(d)
+        crb_star = crb_bound(d)
 
         # ---- alpha sweep: residual weighting gain vs filter threshold ----
         alpha_saving = np.full((len(ALPHAS), len(BW)), np.nan)
@@ -439,7 +445,7 @@ def _load_res(run_dir, replot):
                       std={k: surf[k]["std"] for k in est},
                       mae={k: surf[k]["mae"] for k in est},
                       success={k: surf[k]["success"] for k in est},
-                      crb=np.nanmean(crb_gls, axis=0),
+                      crb=np.nanmean(crb_star, axis=0),
                       alpha_saving=alpha_saving)
         f5_all[n] = dict(est=est, D=D, kbest=kbest, Ztrue=Ztrue, BW=BW,
                          SNRS=SNRS, n=n)
@@ -450,7 +456,7 @@ def _load_res(run_dir, replot):
             pair_D_abs=D, kbest=kbest, alphas=np.array(ALPHAS),
             alpha_saving=alpha_saving,
             **{("est_" + k): v.astype(np.float32) for k, v in est.items()},
-            crb_gls=crb_gls,
+            crb_star=crb_star,
             **{("rmse_" + k): surf[k]["rmse"] for k in est},
             **{("bias_" + k): surf[k]["bias"] for k in est},
             **{("std_" + k): surf[k]["std"] for k in est},
