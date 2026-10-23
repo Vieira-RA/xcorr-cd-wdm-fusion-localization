@@ -64,9 +64,12 @@ def pair_delay(method, a, b, dt, f_max, mag):
     raise ValueError(method)
 
 
-def main(config_path, count=15, n_bw=3, snrs=(40, 60, 80, 100),
+def main(config_path, count=15, n_bw=3, snrs=None,
          n_real=500, i_fibre=0):
     cfg = yaml.safe_load(open(config_path))
+    if snrs is None:
+        sw = cfg["sweep"]["snrs_dB"]
+        snrs = np.linspace(float(sw["start"]), float(sw["stop"]), 4)
     jdir = cfg["output"]["jones_dir"]
     meta = np.load(jdir + "/metadata.npz", allow_pickle=True)
     wl = meta["wavelengths_nm"]; N_full = len(wl)
@@ -94,8 +97,9 @@ def main(config_path, count=15, n_bw=3, snrs=(40, 60, 80, 100),
                     allow_pickle=True)
         U = d["U_all"][sel]; dt = float(d["dt"])
         clean = np.stack([clean_rot_2d(U[c], s_in) for c in range(count)])
-        base_energy = np.mean(np.mean(np.sum(clean ** 2, axis=1), axis=1))
-        print("--- B = %.3g Hz ---" % bw)
+        # Mean per-component integrated energy across the selected channels.
+        base_energy = np.mean(np.sum(clean ** 2, axis=1))
+        print("--- nominal B = %.3g Hz ---" % bw)
         print("%5s | %s" % ("SNR", "  ".join("%-22s" % m for m in METHODS)))
         for snr in snrs:
             s2 = base_energy / 10 ** (snr / 10)

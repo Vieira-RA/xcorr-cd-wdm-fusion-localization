@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Overlay figure: parabolic vs GCC-PHAT (same combiner), RMSE vs SNR at three
-bandwidths, with the star CRB.  Reads two runs' estcomp_<n>ch.npz.
+nominal bandwidths.
 
 Run:  python estimator_compare_fig.py results_crb_equispaced results_crb_equispaced_gcc 15
 """
@@ -11,6 +11,8 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+from snr_conventions import energy_snr_axis_for_run
 
 plt.rcParams.update({
     "font.size": 15, "font.family": "DejaVu Sans", "axes.titlesize": 16,
@@ -28,8 +30,12 @@ def load(run, n):
 
 def main(run_par, run_gcc, n=15, est="robust_pool", out_dir=None):
     a = load(run_par, n); b = load(run_gcc, n)
-    BW = a["BANDWIDTHS"]; SNRS = a["SNRS_dB"]
-    crb = np.nanmean(a["crb_star"] if "crb_star" in a.files else a["crb_gls"], axis=0)
+    BW = a["BANDWIDTHS"]
+    if ("snr_definition" in a.files and
+            str(a["snr_definition"].item()) == crb.ENERGY_SNR_DEFINITION):
+        SNRS = a["SNRS_dB"]
+    else:
+        SNRS = energy_snr_axis_for_run(run_par, n, a["SNRS_dB"])
     nb = len(BW)
     cols = [int(nb*0.2), int(nb*0.5), int(nb*0.8)]
     fig, axes = plt.subplots(1, 3, figsize=(17, 5.2), sharey=True)
@@ -38,9 +44,8 @@ def main(run_par, run_gcc, n=15, est="robust_pool", out_dir=None):
                     label="parabolic")
         ax.semilogy(SNRS, b["rmse_" + est][ib], "s--", color=CP["gcc_phat"],
                     label="GCC-PHAT")
-        ax.semilogy(SNRS, crb[ib], "k--", lw=1.6, label="CRB (star)")
-        ax.set_title(r"$B = %.3g$ kHz" % (BW[ib]/1e3))
-        ax.set_xlabel("SNR (dB)")
+        ax.set_title(r"Nominal $B = %.3g$ kHz" % (BW[ib]/1e3))
+        ax.set_xlabel("Energy SNR (dB)")
         ax.set_ylim(bottom=1e-3)
     axes[0].set_ylabel("RMSE (km)")
     axes[0].legend(loc="upper right")

@@ -8,13 +8,13 @@ run:
 
 # ---------- fibre (disturbed section) ----------
 fibre:
-  L_km: 0.5              # length of the disturbed section
+  L_km: 0.5              # length of the modeled disturbed section
   L_F: 20.0              # birefringence correlation length [m]
   D_pmd: 2.5298e-15
   lambda0_nm: 1550
   seed: 0
 
-# ---------- transient envelope (sigma_t = 0.3748 / bandwidth) ----------
+# ---------- transient envelope (sigma_t = 0.3748 / nominal B) ----------
 transient:
   A_pulse: 0.0031
 
@@ -32,7 +32,7 @@ wdm:
 
 # ---------- CD event ----------
 event:
-  distance_km: 500.0     # position of the disturbed section
+  distance_km: 500.0     # disturbed-section centre from the receiver
 
 # ---------- parameter sweep ----------
 sweep:
@@ -41,14 +41,16 @@ sweep:
     stop_Hz: 2.0e6
     num: 24
   snrs_dB:
-    start: 0.0           # energy SNR E/N0
-    stop: 100.0
+    # Mean per-component energy / per-component noise variance (E/N0).
+    start: 27.7815125038
+    stop: 127.7815125038
     num: 24
   n_realisations: 50
   n_fibres: 2
 
 # ---------- noise ----------
 noise:
+  snr_definition: "mean_per_component_energy_over_noise_variance"
   base_seed: 0
 
 # ---------- pre-processing filter ----------

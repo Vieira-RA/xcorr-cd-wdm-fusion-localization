@@ -17,6 +17,49 @@ import crb
 from signal_processing import parabolic_corr_delay_1d, parabolic_corr_delay_2d
 
 
+def validate_rfft_two_sided_sums():
+    """Check rFFT endpoint/interior weights against explicit full FFT sums."""
+    rng = np.random.RandomState(2468)
+    dt = 2.5e-7
+    for n in (1024, 1025):
+        sig_i = rng.randn(n, 2)
+        sig_j = rng.randn(n, 2)
+        sig_i += np.array([0.7, -0.3])
+        sig_j += np.array([-0.2, 0.4])
+        if n % 2 == 0:
+            # Ensure the Nyquist endpoint is non-zero and counted once.
+            nyq = (-1.0) ** np.arange(n)
+            sig_i[:, 0] += 0.5 * nyq
+            sig_j[:, 0] -= 0.25 * nyq
+
+        xi = np.fft.fft(sig_i - sig_i.mean(axis=0), axis=0)
+        xj = np.fft.fft(sig_j - sig_j.mean(axis=0), axis=0)
+        f = np.fft.fftfreq(n, d=dt)
+        omega = 2.0 * np.pi * f
+        p = np.sum(np.abs(xi) ** 2, axis=1)
+        beta2_full = np.sum(omega ** 2 * p) / np.sum(p)
+        beta2_rfft = crb.mean_square_bandwidth(sig_i, dt)
+        np.testing.assert_allclose(beta2_rfft, beta2_full, rtol=1e-12)
+
+        coherent = np.abs(np.sum(xi * np.conj(xj), axis=1))
+        beta2_coherent_full = np.sum(omega ** 2 * coherent) / np.sum(coherent)
+        beta2_coherent_rfft = crb.coherent_bandwidth(sig_i, sig_j, dt)
+        np.testing.assert_allclose(beta2_coherent_rfft, beta2_coherent_full,
+                                   rtol=1e-12)
+        np.testing.assert_allclose(coherent, coherent[(-np.arange(n)) % n],
+                                   rtol=1e-12, atol=1e-12)
+
+        sigma2 = 0.3
+        j_full = 0.0
+        for c in range(sig_i.shape[1]):
+            rho = np.abs(xi[:, c] * np.conj(xj[:, c])) / (n * sigma2)
+            eff = rho ** 2 / (1.0 + 2.0 * rho)
+            j_full += np.sum(omega ** 2 * eff)
+        j_rfft = crb.fisher_information_delay(sig_i, sig_j, dt, sigma2)
+        np.testing.assert_allclose(j_rfft, j_full, rtol=1e-12)
+    print("One-sided rFFT moments/Fisher information match full two-sided FFT sums.")
+
+
 # ---------------------------------------------------------------------------
 def fractional_shift(x, dt, delay):
     """Exact fractional delay via the Fourier shift theorem."""
@@ -79,6 +122,7 @@ def run_case(B, snrs_db, n_real, dt, true_delay, dim, seed=12345):
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     np.set_printoptions(precision=3, suppress=True)
+    validate_rfft_two_sided_sums()
 
     # --- 1. deterministic identity sanity check ---------------------------
     rng = np.random.RandomState(0)

@@ -21,9 +21,12 @@ Mean-square (RMS) bandwidth:
     beta^2 = int (ds/dt)^2 dt / int s^2 dt
            = sum_k (2 pi f_k)^2 |X_k|^2 / sum_k |X_k|^2
 
-Deterministic bound (doc section 2):
+Deterministic bound (doc section 2, one component):
 
     CRB_det(tau) = 1 / (SNR * beta^2)
+
+For C independent components with common beta and mean per-component energy
+SNR SNR_E, this becomes 1 / (C * SNR_E * beta^2).
 
 Two-sensor effective SNR (doc section 3.2/3.3), generalised to two possibly
 different signals via their coherent cross-spectrum:
@@ -31,8 +34,8 @@ different signals via their coherent cross-spectrum:
     S(f)        = P_coh(f) = | sum_c X_i,c(f) conj(X_j,c(f)) |
     rho_i(f)    = S(f) / N_i(f),   N_i(f) = n_comp * N * sigma_i^2 (per-bin)
     SNR_eff(f)  = (S/N1)(S/N2) / (1 + S/N1 + S/N2)
-    J_CR         = (T/2pi) * int w^2 SNR_eff(w) dw
-                 = 2 * sum_{k>0} w_k^2 SNR_eff[k]      (one-sided discrete)
+     J_CR         = (T/2pi) * int w^2 SNR_eff(w) dw
+                  = a sum over the full two-sided spectrum
 
     CRB_eff(tau) = 1 / J_CR
 
@@ -42,6 +45,31 @@ a factor 2 looser than the known-template deterministic bound).
 """
 
 import numpy as np
+from scipy.optimize import nnls
+
+ENERGY_SNR_DEFINITION = "mean_per_component_energy_over_noise_variance"
+
+
+def energy_snr_offset_db(n_samples, n_components=2):
+    """Convert the legacy sweep axis to mean per-component energy SNR.
+
+    The legacy sweep used ``sigma2 = mean_t(sum_c x_c[t]**2) / SNR``.  The
+    resulting mean per-component energy SNR is ``(n_samples/n_components)``
+    times that sweep value.  This is for relabelling saved runs; new simulation
+    code should set the noise variance from :func:`noise_variance_for_snr`.
+    """
+    if n_samples <= 0 or n_components <= 0:
+        raise ValueError("n_samples and n_components must be positive")
+    return 10.0 * np.log10(float(n_samples) / float(n_components))
+
+
+def _one_sided_weights(n_samples):
+    """Weights converting an rFFT sum into a two-sided spectral sum."""
+    weights = np.full(n_samples // 2 + 1, 2.0)
+    weights[0] = 1.0
+    if n_samples % 2 == 0:
+        weights[-1] = 1.0
+    return weights
 
 
 # ---------------------------------------------------------------------------
@@ -125,14 +153,16 @@ def coherent_bandwidth(sig_i, sig_j, dt):
     f = np.fft.rfftfreq(sig_i.shape[0], d=dt)
     w = 2.0 * np.pi * f
     P = coherent_spectrum(sig_i, sig_j, dt)
-    return np.sum(w ** 2 * P) / np.sum(P)
+    one_sided = _one_sided_weights(sig_i.shape[0])
+    return np.sum(one_sided * w ** 2 * P) / np.sum(one_sided * P)
 
 
 def mean_square_bandwidth(sig, dt):
     """beta^2 = sum_k w_k^2 |X_k|^2 / sum_k |X_k|^2  [rad^2/s^2]."""
     f, P = power_spectrum(sig, dt)
     w = 2.0 * np.pi * f
-    return np.sum(w ** 2 * P) / np.sum(P)
+    one_sided = _one_sided_weights(_as_2d(sig).shape[0])
+    return np.sum(one_sided * w ** 2 * P) / np.sum(one_sided * P)
 
 
 # ---------------------------------------------------------------------------
@@ -154,12 +184,14 @@ def fisher_information_deterministic(sig, dt, noise_var):
     sig = _as_2d(sig)
     f = np.fft.rfftfreq(sig.shape[0], d=dt)
     w = 2.0 * np.pi * f
+    one_sided = _one_sided_weights(sig.shape[0])
     X = np.fft.rfft(sig - sig.mean(axis=0, keepdims=True), axis=0)
     J = 0.0
     for c in range(sig.shape[1]):
         P = np.abs(X[:, c]) ** 2
-        E = np.sum(sig[:, c] ** 2)
-        beta2 = np.sum(w ** 2 * P) / np.sum(P)
+        x_ac = sig[:, c] - np.mean(sig[:, c])
+        E = np.sum(x_ac ** 2)
+        beta2 = np.sum(one_sided * w ** 2 * P) / np.sum(one_sided * P)
         J += E * beta2 / noise_var
     return J
 
@@ -206,7 +238,9 @@ def _component_coherent_spectra(sig_i, sig_j):
 
 def fisher_information_delay(sig_i, sig_j, dt, noise_var):
     """
-    J_CR = sum_c 2 * sum_{k>0} w_k^2 SNR_eff,c[k]   [1/s^2].
+    J_CR = sum_c sum_k q_k w_k^2 SNR_eff,c[k]       [1/s^2],
+    where q_k=2 for positive-frequency bins paired with a negative bin,
+    and q_k=1 at DC and (for even N) Nyquist.
 
     Each independent signal component contributes its own Fisher information
     (they are independent observations of the same delay), so the per-component
@@ -216,10 +250,11 @@ def fisher_information_delay(sig_i, sig_j, dt, noise_var):
     sig_i = _as_2d(sig_i)
     f = np.fft.rfftfreq(sig_i.shape[0], d=dt)
     w = 2.0 * np.pi * f
+    one_sided = _one_sided_weights(sig_i.shape[0])
     J = 0.0
     for P_coh_c in _component_coherent_spectra(sig_i, sig_j):
         snr_eff = effective_snr_spectrum(P_coh_c, noise_var, sig_i.shape[0])
-        J += 2.0 * np.sum(w ** 2 * snr_eff)
+        J += np.sum(one_sided * w ** 2 * snr_eff)
     return J
 
 
@@ -234,7 +269,7 @@ def crb_delay_effective(sig_i, sig_j, dt, noise_var):
 # ---------------------------------------------------------------------------
 def crb_distance(crb_delay, D_abs_ps_per_km):
     """
-    Map a delay CRB [s^2] to a distance CRB [km^2]:
+    Map a delay CRB [s^2] to a distance standard deviation [km]:
 
         sigma_Z = sqrt(CRB_tau) * 1e12 / |int D dlambda|     (ps -> km)
 
@@ -250,8 +285,8 @@ def combined_crb_distance(crb_delay_pairs, D_abs_pairs):
         sigma_Z,comb = [ sum_ij 1 / sigma_Z,ij^2 ]^{-1/2}
 
     NOTE: assumes the pair estimates are independent. All channel pairs share
-    channels, so this is optimistic; see star_combined_crb_distance for a
-    correlation-aware, achievable bound.
+    channels, so this is optimistic. Use gls_combined_crb_distance for the
+    covariance-aware combination under the additive channel-timing model.
     """
     crb_delay_pairs = np.asarray(crb_delay_pairs, dtype=float)
     D_abs_pairs = np.asarray(D_abs_pairs, dtype=float)
@@ -262,14 +297,14 @@ def combined_crb_distance(crb_delay_pairs, D_abs_pairs):
 def star_combined_crb_distance(crb_delay_pairs, D_abs_pairs, pair_indices,
                                n_channels):
     """
-    Correlation-aware achievable bound for the combined distance:
+    Legacy independent-edge star approximation (not a joint CRB).
 
-    for each reference channel r, combine only the (r, k) pairs,
-        sigma_r = [ sum_k D_{rk}^2 / (CRB_tau,rk * 1e24) ]^{-1/2}
-    and return the best (smallest) over r.
+    This sums marginal pair information while ignoring covariance between
+    edges that share the reference channel.  It is retained only for
+    reproducing old results.  Use :func:`gls_combined_crb_distance` for the
+    covariance-aware combination under the additive channel-timing model.
 
-    Uses the n_channels - 1 independent delays instead of the redundant
-    n_pairs, so it is not inflated by inter-pair correlations.
+    The result can be optimistic and must not be labelled an achievable CRB.
     """
     crb_delay_pairs = np.asarray(crb_delay_pairs, dtype=float)
     D_abs_pairs = np.asarray(D_abs_pairs, dtype=float)
@@ -297,50 +332,121 @@ def _incidence(pair_indices, n_channels):
     return A
 
 
+def _channel_dispersion_coordinates(D_abs_pairs, pair_indices, n_channels):
+    """Recover 1-D channel coordinates from complete pairwise |D_ij| values."""
+    D_abs_pairs = np.asarray(D_abs_pairs, dtype=float)
+    pairs = np.asarray(pair_indices, dtype=int)
+    coord = np.full(n_channels, np.nan, dtype=float)
+    coord[0] = 0.0
+    for k, (i, j) in enumerate(pairs):
+        if i == 0:
+            coord[j] = D_abs_pairs[k]
+        elif j == 0:
+            coord[i] = D_abs_pairs[k]
+    if not np.all(np.isfinite(coord)):
+        raise ValueError("pair set must connect every channel to reference 0")
+    predicted = np.abs(coord[pairs[:, 0]] - coord[pairs[:, 1]])
+    scale = max(float(np.max(D_abs_pairs)), 1.0)
+    if not np.allclose(predicted, D_abs_pairs, rtol=1e-8, atol=1e-10 * scale):
+        raise ValueError("D_abs pairs are not consistent with 1-D channel coordinates")
+    return coord
+
+
 def per_channel_variances(crb_delay_pairs, pair_indices, n_channels,
                           nonneg=True):
     """
-    Per-channel delay variances u_k such that Var(tau_ij) = u_i + u_j
-    (which holds for the two-sensor effective SNR at high SNR).  Fitted by
-    least squares to the per-pair CRBs.
+    Per-channel delay variances ``u_k`` such that ``Var(tau_ij)=u_i+u_j``.
+    The non-negative least-squares fit is a model assumption to validate, not
+    an identity for arbitrary pairwise CRBs.
     """
     A = np.zeros((len(pair_indices), n_channels))
     for k, (i, j) in enumerate(pair_indices):
         A[k, i] = 1.0
         A[k, j] = 1.0
-    u, *_ = np.linalg.lstsq(A, np.asarray(crb_delay_pairs, dtype=float),
-                            rcond=None)
+    y = np.asarray(crb_delay_pairs, dtype=float)
+    valid = np.isfinite(y) & (y >= 0.0)
+    if not np.any(valid):
+        return np.full(n_channels, np.nan)
+    # Closed-form ordinary least squares for a complete pair graph.  Most
+    # production sweeps have every pair, so this avoids thousands of optimizer
+    # calls when rebuilding the full covariance-bound surface.
+    if (n_channels > 2 and np.all(valid) and
+            len(pair_indices) == n_channels * (n_channels - 1) // 2):
+        row_sums = np.zeros(n_channels, dtype=float)
+        for k, (i, j) in enumerate(pair_indices):
+            row_sums[i] += y[k]
+            row_sums[j] += y[k]
+        total_u = np.sum(y) / (n_channels - 1)
+        u_closed = (row_sums - total_u) / (n_channels - 2)
+        if not nonneg or np.all(u_closed >= 0.0):
+            return u_closed
+    # Scale tiny variances (often around 1e-20 s^2) before the solve.
+    scale = float(np.max(y[valid]))
+    if scale <= 0.0:
+        return np.zeros(n_channels)
     if nonneg:
-        u = np.clip(u, 0.0, None)
+        u_scaled, _ = nnls(A[valid], y[valid] / scale)
+        u = u_scaled * scale
+    else:
+        u, *_ = np.linalg.lstsq(A[valid], y[valid], rcond=None)
     return u
 
 
 def gls_combined_crb_distance(crb_delay_pairs, D_abs_pairs, pair_indices,
                               n_channels):
-    """
-    Covariance-aware (GLS) bound and weights for the combined distance.
+    """Conditional joint-GLS variance under an additive channel-timing model.
 
-    Model: the per-pair error is a signed combination of independent
-    per-channel timing errors, so Cov(tau) = A diag(u) A^T is rank n_ch - 1.
-    In distance units Sigma_Z = diag(c/D) Cov(tau) diag(c/D), c = 1e12.
-    The GLS estimator is Zhat = sum_k w_k Z_k / sum_k w_k with w = Sigma_Z^+ 1,
-    and its variance is 1 / (1^T Sigma_Z^+ 1).
+    Assumption: pair-delay errors are signed differences of independent
+    per-channel timing errors, so ``Sigma_tau = A diag(u) A.T`` and
+    ``Var(tau_ij)=u_i+u_j``.  The non-negative ``u`` values are fitted to the
+    marginal pair CRBs.  In distance units,
+    ``Sigma_Z = diag(1e12/|D|) Sigma_tau diag(1e12/|D|)``.
+
+    A spanning star is sufficient under this model, but its edges are not
+    independent.  The common event-time nuisance parameter is eliminated in
+    closed form from the channel-level timing model.  The returned full-length
+    weight vector is zero off the selected star.
+    This is not a universal combined CRB: it is valid only to the extent that
+    the additive channel-timing covariance model is adequate. Validate both
+    marginal and cross-covariance predictions against Monte Carlo pair errors.
 
     Returns
     -------
     sigma_Z : float  combined distance std (km)
-    weights : (n_pairs,) GLS weights (equal for identical D and CRB)
+    weights : (n_pairs,) weights supported on a covariance-aware star
     """
     crb_delay_pairs = np.asarray(crb_delay_pairs, dtype=float)
     D_abs_pairs = np.asarray(D_abs_pairs, dtype=float)
     u = per_channel_variances(crb_delay_pairs, pair_indices, n_channels)
-    A = _incidence(pair_indices, n_channels)
-    Sigma_tau = (A * u[None, :]) @ A.T
-    B = 1e12 / np.abs(D_abs_pairs)
-    Sigma_Z = Sigma_tau * np.outer(B, B)
-    ones = np.ones(len(pair_indices))
-    w = np.linalg.pinv(Sigma_Z) @ ones
-    var = 1.0 / (ones @ w)
+    if not np.all(np.isfinite(u)):
+        return np.nan, np.full(len(pair_indices), np.nan)
+    coord_s_per_km = _channel_dispersion_coordinates(
+        D_abs_pairs, pair_indices, n_channels) * 1e-12
+    w = np.zeros(len(pair_indices), dtype=float)
+    zero_tol = max(float(np.max(u)), np.finfo(float).tiny) * 1e-12
+    exact = np.flatnonzero(u <= zero_tol)
+    # Boundary NNLS solutions indicate that the additive covariance model is
+    # not identifiable from these marginal CRBs; do not turn them into a
+    # spurious zero-noise channel and an overconfident combined reference.
+    if len(exact):
+        return np.nan, w
+
+    precision = 1.0 / u
+    dbar = float(np.sum(precision * coord_s_per_km) / np.sum(precision))
+    centered = coord_s_per_km - dbar
+    information = float(np.sum(precision * centered ** 2))
+    if not np.isfinite(information) or information <= 0.0:
+        return np.nan, w
+    # The BLUE for channel times has coefficients a_i = J^-1 u_i^-1
+    # (d_i - dbar), which sum to zero.  Relative to channel 0 this becomes a
+    # star-weighted mean of pair-distance estimates with weights a_i*d_i.
+    a = precision * centered / information
+    for k, (i, j) in enumerate(pair_indices):
+        if i == 0:
+            w[k] = a[j] * coord_s_per_km[j]
+        elif j == 0:
+            w[k] = a[i] * coord_s_per_km[i]
+    var = 1.0 / information
     return np.sqrt(var), w
 
 
@@ -381,7 +487,7 @@ if __name__ == "__main__":
     rng = np.random.RandomState(0)
     N, dt = 2048, 1e-6
     sig = rng.randn(N)
-    snr_db = 30.0
+    snr_db = 80.0
     sigma2 = noise_variance_for_snr(sig, snr_db)
 
     snr = per_component_snr(sig, sigma2)

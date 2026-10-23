@@ -5,7 +5,8 @@ CRB-study post-processor (2-D SOP only).
 Pipeline per (fibre, bandwidth):
   * build clean 2-D Stokes (quaternion rotation of a fixed input Stokes),
     rotate the centroid to the north pole;
-  * energy-SNR noise injection (sigma^2 = <per-component energy>/SNR_lin),
+  * per-component energy-SNR noise injection
+    (sigma^2 = mean component energy / SNR_lin),
     common across channels (physically the receiver noise floor);
   * optional low-pass / band-pass filter;
   * per channel-pair delay via parabolic interpolation of the 2-D
@@ -153,6 +154,10 @@ def main(config_path):
     f_high = float(fcfg.get("high_factor", 3.0))
 
     noise_seed = int(cfg.get("noise", {}).get("base_seed", 0))
+    snr_definition = cfg.get("noise", {}).get(
+        "snr_definition", crb.ENERGY_SNR_DEFINITION)
+    if snr_definition != crb.ENERGY_SNR_DEFINITION:
+        raise ValueError("Unsupported SNR definition: %s" % snr_definition)
     jones_dir = cfg["output"]["jones_dir"]
     run_dir = cfg["output"].get("run_dir", "results_crb")
     save_pairs = cfg.get("output", {}).get("save_pairs", "all")
@@ -202,6 +207,7 @@ def main(config_path):
             wavelengths_nm=wl, pair_indices=np.array(pair_indices),
             D_abs=D_abs, event_distance_km=event_distance_km,
             n_fibres=n_fibres, n_real=N_REAL, filter_mode=f_mode,
+            snr_definition=snr_definition,
             filter_params=dict(order=f_order, low=f_low, high=f_high),
             cfg=cfg,
         )
@@ -211,6 +217,12 @@ def main(config_path):
         pair_shape = (n_fibres, n_bw, n_snr, N_REAL, n_pairs)
         if os.path.exists(state_file):
             st = np.load(state_file, allow_pickle=True)
+            if ("snr_definition" not in st.files or
+                    str(st["snr_definition"]) != snr_definition):
+                raise RuntimeError(
+                    "Checkpoint uses a different or legacy SNR convention: "
+                    + state_file + ". Preserve it and start a new run directory."
+                )
             print(f"  Resuming {count}ch from checkpoint "
                   f"(fibres {sorted(int(x) for x in st['completed'])} done)")
             est_crb_a = st["est_crb"]
@@ -228,6 +240,7 @@ def main(config_path):
             sigma2_a = st["sigma2"]
             beta2_a = st["beta2"]
             energy_a = st["energy"]
+            n_samples_a = st["n_samples"]
             pair_Z_a = (st["pair_Z"] if (store_pairs and "pair_Z" in st.files)
                         else (np.full(pair_shape, np.nan, dtype=np.float32)
                               if store_pairs else None))
@@ -246,6 +259,7 @@ def main(config_path):
             sigma2_a = np.full((n_fibres, n_bw, n_snr), np.nan)
             beta2_a = np.full((n_fibres, n_bw, n_ch), np.nan)
             energy_a = np.full((n_fibres, n_bw, n_ch), np.nan)
+            n_samples_a = np.full((n_fibres, n_bw), np.nan)
             pair_Z_a = (np.full(pair_shape, np.nan, dtype=np.float32)
                         if store_pairs else None)
             completed = set()
@@ -258,9 +272,11 @@ def main(config_path):
                      crb_dist_pairs=crb_dist_pairs,
                      crb_dist_combined_eff=crb_eff_comb,
                      crb_dist_combined_det=crb_det_comb,
-                     crb_dist_combined_gls=crb_gls_comb,
-                     sigma2=sigma2_a, beta2=beta2_a, energy=energy_a,
-                     completed=np.array(sorted(done)))
+                      crb_dist_combined_gls=crb_gls_comb,
+                      crb_dist_combined_joint=crb_gls_comb,
+                      sigma2=sigma2_a, beta2=beta2_a, energy=energy_a,
+                      n_samples=n_samples_a,
+                      completed=np.array(sorted(done)))
             if store_pairs:
                 d["pair_Z"] = pair_Z_a
             np.savez_compressed(state_file, **d)
@@ -280,10 +296,14 @@ def main(config_path):
                 clean2d = np.stack([clean_rot_2d(U[c], s_in)
                                     for c in range(n_ch)])   # (n_ch, N, 2)
 
-                # energies (per-component) and bandwidths
-                E_ch = np.mean(np.sum(clean2d ** 2, axis=1), axis=1)   # (n_ch,)
-                base_energy = np.mean(E_ch)
+                # Energy per component is the mean over channels of each
+                # component's sum_n x[n,c]^2.  This is the convention used by
+                # crb.noise_variance_for_snr and by the plotted energy SNR.
+                E_ch = np.mean(np.sum(clean2d ** 2, axis=1), axis=1)  # total 2-D power
+                E_component = np.sum(clean2d ** 2, axis=1)            # (n_ch, 2)
+                base_energy_per_component = np.mean(E_component)
                 energy_a[i_f, i_bw] = E_ch
+                n_samples_a[i_f, i_bw] = clean2d.shape[1]
                 beta2_a[i_f, i_bw] = [
                     crb.mean_square_bandwidth(clean2d[c], dt) for c in range(n_ch)
                 ]
@@ -294,7 +314,7 @@ def main(config_path):
                 snr_meta = []
                 jobs = []
                 for i_snr, snr_lin in enumerate(SNRS_LIN):
-                    sigma2 = base_energy / snr_lin
+                    sigma2 = base_energy_per_component / snr_lin
                     sigma2_a[i_f, i_bw, i_snr] = sigma2
 
                     cd = np.empty(n_pairs)
@@ -311,6 +331,9 @@ def main(config_path):
                         cd, D_abs)
                     crb_det_comb[i_f, i_bw, i_snr] = crb.combined_crb_distance(
                         cdet, D_abs)
+                    # Conditional reference/weights under the additive
+                    # independent-channel timing-error model.  This is a
+                    # diagnostic, not a universal combined CRB.
                     gls_std, w_gls = crb.gls_combined_crb_distance(
                         cd, D_abs, pair_indices, n_ch)
                     crb_gls_comb[i_f, i_bw, i_snr] = gls_std
@@ -350,7 +373,9 @@ def main(config_path):
             crb_dist_combined_eff=crb_eff_comb,
             crb_dist_combined_det=crb_det_comb,
             crb_dist_combined_gls=crb_gls_comb,
+            crb_dist_combined_joint=crb_gls_comb,
             sigma2=sigma2_a, beta2=beta2_a, energy=energy_a,
+            n_samples=n_samples_a,
         )
         if store_pairs:
             save_dict["pair_Z"] = pair_Z_a

@@ -122,6 +122,9 @@ def main(config_path):
     wavelengths_nm = frequency_to_wavelength(freq_channels)
     N_full = len(freq_channels)
 
+    # The PMD/Jones model covers the local disturbed section (fibre.L_km).
+    # The centre of that section is placed event_distance_km from the receiver;
+    # the remaining link is represented by its deterministic CD group delay.
     event_distance_km = float(cfg["event"]["distance_km"])
     channel_delays = relative_channel_delays(wavelengths_nm, event_distance_km)
 
@@ -171,6 +174,9 @@ def main(config_path):
         os.makedirs(fibre_dir, exist_ok=True)
 
         for i_bw, bw in enumerate(tqdm(BANDWIDTHS, desc=f"Fibre {i_fibre} BW")):
+            # bw is the nominal envelope parameter.  For a Gaussian envelope,
+            # this sets the Fourier-amplitude FWHM to bw; its full power
+            # 3-dB width is approximately 0.707*bw.
             sigma_t = 0.3748 / bw
             fs = fs_factor * bw
             dt = 1.0 / fs
@@ -190,6 +196,8 @@ def main(config_path):
                                         (z.shape[0], n_samples))
             U_all = propagate_channels(z, beta_all, delta_z_t)
 
+            # Apply the wavelength-dependent delay for the event-to-receiver
+            # path to the local-section waveform using the FFT shift theorem.
             for local_ch, full_idx in enumerate(union_indices):
                 U_all[local_ch] = delay_jones_sequence(
                     U_all[local_ch], dt, channel_delays[full_idx]

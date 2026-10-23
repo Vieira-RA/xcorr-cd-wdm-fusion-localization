@@ -8,7 +8,7 @@ run:
   n_jobs: -1
 
 fibre:
-  L_km: 0.5
+  L_km: 0.5              # modeled local disturbed section length
   L_F: 20.0
   D_pmd: 2.5298e-15
   lambda0_nm: 1550
@@ -29,7 +29,7 @@ wdm:
   f_max_Hz: 196e12
 
 event:
-  distance_km: 500.0
+  distance_km: 500.0     # section centre distance from the receiver
 
 sweep:
   bandwidths:
@@ -37,13 +37,15 @@ sweep:
     stop_Hz: 2.0e6
     num: 50
   snrs_dB:
-    start: 15.0
-    stop: 100.0
+    # Mean per-component energy / per-component noise variance (E/N0).
+    start: 42.7815125038
+    stop: 127.7815125038
     num: 50
   n_realisations: 100
   n_fibres: 10
 
 noise:
+  snr_definition: "mean_per_component_energy_over_noise_variance"
   base_seed: 0
 
 # GCC-PHAT settings (also the estimator switch lives under analysis)

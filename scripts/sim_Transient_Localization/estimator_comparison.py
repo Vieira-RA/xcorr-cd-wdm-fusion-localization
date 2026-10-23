@@ -11,7 +11,9 @@ Estimators
 
 Reference
 ---------
-  crb_gls  : covariance-aware (GLS) combined CRB (from crb_delay_pairs)
+  This script reports empirical fusion RMSE, bias, and standard deviation.
+  The combined pair covariance is not treated as a universal CRB; see
+  ``validate_joint_crb.py`` for the conditional covariance-model diagnostic.
 
 Figures (results/<run>/figs_estimators/)
   F1  RMSE vs SNR at three bandwidths (money plot)
@@ -19,7 +21,7 @@ Figures (results/<run>/figs_estimators/)
   F3  iso-precision: SNR needed for target RMSE vs bandwidth
   F4  dB gain vs number of channels
   F5  error distributions at a threshold cell
-  F6  gap-to-CRB vs SNR
+  F6  bias/variance decomposition vs SNR
 
 All derived arrays are saved to results/<run>/estcomp_<n>ch.npz so the figures
 can be rebuilt without recomputation.
@@ -37,6 +39,7 @@ from matplotlib.lines import Line2D
 from matplotlib.colors import LogNorm
 
 import crb
+from snr_conventions import energy_snr_axis_for_run
 
 # ---------------------------- publication style ---------------------------
 plt.rcParams.update({
@@ -66,12 +69,12 @@ POOL_ESTS = ["average_pool", "disp_pool", "robust_pool"]
 PLOT_ESTS = ["average_pool", "disp_pool", "robust_pool"]   # filtered pool only
 MSS = {"average": 9, "disp": 14, "robust": 8,
        "average_pool": 9, "disp_pool": 14, "robust_pool": 8}
-POOL_ALPHA = 0.25   # keep pairs with D >= POOL_ALPHA * max(D)
+POOL_ALPHA = 0.25   # keep pairs with D^2 >= alpha * max(D^2)
 ALPHAS = [0.0, 0.05, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50, 0.70]
 
 
 def pool_pair_estimators(Zp, D2, alpha, c=2.5, iqr_factor=1.5):
-    """Naive and D^2-weighted estimates over the pool D >= alpha*max(D)."""
+    """Naive and D^2-weighted estimates for D^2 >= alpha*max(D^2)."""
     m = np.ones(D2.shape, dtype=bool) if alpha <= 0 else (D2 >= alpha * np.max(D2))
     Zpp = Zp[..., m]
     D2p = D2[m]
@@ -122,7 +125,7 @@ def combine_estimators(Zp, D2, kbest, kworst=None, c=2.5, iqr_factor=1.5):
     den = np.nansum(w, axis=-1)
     out["robust"] = np.where(den > 0, num / den, np.nan)
 
-    # ---- pool-filtered variants: drop uninformative pairs (D >= a*max D) ----
+    # ---- pool-filtered variants: D^2 >= alpha * max(D^2) ----
     m = D2 >= (POOL_ALPHA * np.max(D2))
     Zpp = Zp[..., m]
     D2p = D2[m]
@@ -155,22 +158,6 @@ def metrics(E, Ztrue, tol):
     return dict(rmse=np.sqrt(mse), bias=bias, std=std, mae=mae, success=succ)
 
 
-def crb_bound(d):
-    """Achievable combined CRB via the *star* combination (robust: the GLS
-    u-fit is unreliable on wide-D-spread grids, where it can exceed the star
-    bound, which is impossible)."""
-    cd = d["crb_delay_pairs"]; D = d["D_abs"]
-    pairs = list(d["pair_indices"]); nch = int(d["channel_indices_full"].shape[0])
-    nf, nbw, nsnr, _ = cd.shape
-    out = np.full((nf, nbw, nsnr), np.nan)
-    for f in range(nf):
-        for ib in range(nbw):
-            for is_ in range(nsnr):
-                out[f, ib, is_] = crb.star_combined_crb_distance(
-                    cd[f, ib, is_], D, pairs, nch)
-    return out
-
-
 # --------------------------------- plots ----------------------------------
 def fig1_money(res, counts, BW, SNRS, embed_dir):
     key = counts[-1]
@@ -183,9 +170,8 @@ def fig1_money(res, counts, BW, SNRS, embed_dir):
             mfc = "none" if est == "disp" else COL[est]
             ax.semilogy(SNRS, r["rmse"][est][ib], marker=MARK[est], ms=MSS[est],
                         color=COL[est], markerfacecolor=mfc, label=LBL[est])
-        ax.semilogy(SNRS, r["crb"][ib], "k--", lw=1.6, label="CRB (GLS)")
-        ax.set_title(r"$B = %.3g$ kHz" % (BW[ib] / 1e3))
-        ax.set_xlabel("SNR (dB)")
+        ax.set_title(r"Nominal $B = %.3g$ kHz" % (BW[ib] / 1e3))
+        ax.set_xlabel("Energy SNR (dB)")
         ax.set_ylim(bottom=1e-3)
     axes[0].set_ylabel("RMSE (km)")
     axes[0].legend(loc="upper right")
@@ -202,16 +188,16 @@ def fig2_ratio_maps(res, counts, BW, SNRS, embed_dir):
     X, Y = np.meshgrid(SNRS, BW)
     pc = ax0.pcolormesh(X, Y, dB, shading="auto", cmap="magma",
                         vmin=0, vmax=np.nanmax(dB))
-    ax0.set_yscale("log"); ax0.set_xlabel("SNR (dB)")
-    ax0.set_ylabel("Bandwidth (Hz)")
+    ax0.set_yscale("log"); ax0.set_xlabel("Energy SNR (dB)")
+    ax0.set_ylabel("Nominal envelope parameter B (Hz)")
     ax0.set_title("pure average: improvement over robust")
     fig.colorbar(pc, ax=ax0, label="improvement (dB)")
 
     # diagnostic: improvement at the highest SNR, versus bandwidth
     is_hi = len(SNRS) - 1
     ax1.semilogx(BW, dB[:, is_hi], "o-", color=COL["disp"])
-    ax1.set_xlabel("Bandwidth (Hz)")
-    ax1.set_ylabel("improvement at SNR = %.0f dB (dB)" % SNRS[is_hi])
+    ax1.set_xlabel("Nominal envelope parameter B (Hz)")
+    ax1.set_ylabel("improvement at energy SNR = %.1f dB (dB)" % SNRS[is_hi])
     ax1.set_title("high-SNR diagnostic")
     fig.suptitle("Robust vs pure averaging, %d ch" % key, y=1.02)
     f = os.path.join(embed_dir, "F2_improvement_maps.png")
@@ -234,8 +220,8 @@ def fig3_snr_saving(res, counts, BW, SNRS, embed_dir, target=TARGET_RMSE,
         ax.semilogx(BW, d, marker=mk[ci % len(mk)], ms=10, color=cmap[ci],
                     label="%d ch" % nch)
     ax.axhline(0, color="k", lw=0.8)
-    ax.set_xlabel("Bandwidth (Hz)")
-    ax.set_ylabel("SNR saved over pure averaging (dB)")
+    ax.set_xlabel("Nominal envelope parameter B (Hz)")
+    ax.set_ylabel("Energy SNR saved over pure averaging (dB)")
     ax.set_title("Weighting benefit: %s vs pure averaging (RMSE = %.3g km)"
                  % (LBL.get(est, est), target))
     ax.legend(title="channels")
@@ -253,11 +239,9 @@ def fig4_snr_vs_channels(res, counts, BW, SNRS, embed_dir, ib=None,
         mfc = "none" if est == "disp" else COL[est]
         ax.plot(counts, y, marker=MARK[est], ms=MSS[est], color=COL[est],
                 markerfacecolor=mfc, label=LBL[est])
-    y = [snr_for_target(res[c]["crb"][ib], SNRS, target) for c in counts]
-    ax.plot(counts, y, "k--", lw=1.6, label="CRB (GLS)")
     ax.set_xlabel("Number of channels")
-    ax.set_ylabel("SNR for RMSE = %.3g km (dB), lower = better" % target)
-    ax.set_title("Design curve (B = %.3g kHz)" % (BW[ib] / 1e3))
+    ax.set_ylabel("Energy SNR for RMSE = %.3g km (dB), lower = better" % target)
+    ax.set_title("Design curve (nominal B = %.3g kHz)" % (BW[ib] / 1e3))
     ax.legend()
     ax.text(0.02, 0.02, "curve absent = target not reached within SNR grid",
             transform=ax.transAxes, fontsize=12, color="0.3")
@@ -270,7 +254,10 @@ def fig5_distributions(f5, embed_dir, ib=None, is_=None):
     if ib is None:
         ib = len(BW) // 2
     if is_ is None:
-        is_ = int(np.argmin(np.abs(SNRS - 50.0)))
+        # Preserve the legacy nominal 50-dB power-SNR sample after converting
+        # the axis to per-component energy SNR (N=1200, two components).
+        target_energy_snr = 50.0 + crb.energy_snr_offset_db(1200, 2)
+        is_ = int(np.argmin(np.abs(SNRS - target_energy_snr)))
     fig, ax = plt.subplots(figsize=(9, 5.8))
     for k in PLOT_ESTS:
         e = np.clip(np.sort(np.abs(np.ravel(est[k][:, ib, is_, :] - Ztrue))),
@@ -283,36 +270,37 @@ def fig5_distributions(f5, embed_dir, ib=None, is_=None):
                 va="center", ha="left", fontsize=12, color="0.3")
     ax.set_xlabel("|error| (km)")
     ax.set_ylabel(r"fraction of estimates $\leq x$")
-    ax.set_title("%d ch | ECDF of error (B = %.3g kHz, SNR = %.0f dB)"
+    ax.set_title("%d ch | ECDF (nominal B = %.3g kHz, energy SNR = %.1f dB)"
                  % (f5["n"], BW[ib] / 1e3, SNRS[is_]))
     ax.legend(loc="lower right")
     f = os.path.join(embed_dir, "F5_error_distributions.png")
     fig.savefig(f); plt.close(fig); return f
 
 
-def fig6_gap(res, counts, BW, SNRS, embed_dir):
+def fig6_bias_variance(res, counts, BW, SNRS, embed_dir):
     key = counts[-1]; r = res[key]; ib = len(BW) // 2
     fig, axes = plt.subplots(1, 2, figsize=(15, 5.8))
     for est in PLOT_ESTS:
         mfc = "none" if est == "disp" else COL[est]
-        axes[0].semilogy(SNRS, r["rmse"][est][ib] / r["crb"][ib],
+        axes[0].semilogy(SNRS, r["rmse"][est][ib],
                          marker=MARK[est], ms=MSS[est], color=COL[est],
                          markerfacecolor=mfc, label=LBL[est] + " (RMSE)")
-        axes[0].semilogy(SNRS, r["std"][est][ib] / r["crb"][ib],
+        axes[0].semilogy(SNRS, r["std"][est][ib],
                          ls=":", color=COL[est], lw=1.5)
         axes[1].semilogy(SNRS, np.abs(r["bias"][est][ib]),
                          marker=MARK[est], ms=MSS[est], color=COL[est],
                          markerfacecolor=mfc, label=LBL[est])
-    axes[0].axhline(1.0, color="k", ls="--", lw=1.4, label="CRB")
-    axes[0].set_ylabel("RMSE / CRB (solid);   std / CRB (dotted)")
-    axes[0].set_title("Efficiency incl. bias (%d ch, B = %.3g kHz)"
+    axes[0].set_ylabel("Error (km)")
+    axes[0].text(0.02, 0.02, "solid: RMSE; dotted: std",
+                 transform=axes[0].transAxes, fontsize=11, color="0.3")
+    axes[0].set_title("Bias/variance decomposition (%d ch, nominal B = %.3g kHz)"
                       % (key, BW[ib] / 1e3))
     axes[1].set_ylabel("|bias| (km)")
     axes[1].set_title("Bias (%d ch)" % key)
     for a in axes:
-        a.set_xlabel("SNR (dB)")
+        a.set_xlabel("Energy SNR (dB)")
     axes[0].legend(fontsize=11)
-    f = os.path.join(embed_dir, "F6_gap_to_crb.png")
+    f = os.path.join(embed_dir, "F6_bias_variance.png")
     fig.savefig(f); plt.close(fig); return f
 
 
@@ -330,9 +318,9 @@ def fig7_pool(res, counts, BW, SNRS, embed_dir, ib=None, target=TARGET_RMSE):
                  markerfacecolor="none", label="$D^2$ (filtered pool)")
     ax0.semilogy(SNRS, r["rmse"]["robust_pool"][ib], "v--", color=COL["robust"],
                  label="robust (filtered pool)")
-    ax0.semilogy(SNRS, r["crb"][ib], "k--", lw=1.6, label="CRB (all pairs)")
-    ax0.set_xlabel("SNR (dB)"); ax0.set_ylabel("RMSE (km)")
-    ax0.set_title("%d ch, B = %.3g kHz" % (key, BW[ib] / 1e3))
+    ax0.set_xlabel("Energy SNR (dB)")
+    ax0.set_ylabel("RMSE (km)")
+    ax0.set_title("%d ch, nominal B = %.3g kHz" % (key, BW[ib] / 1e3))
     ax0.legend()
 
     def sav(rr, base, w):
@@ -340,16 +328,22 @@ def fig7_pool(res, counts, BW, SNRS, embed_dir, ib=None, target=TARGET_RMSE):
                        for b in range(len(BW))])
         nw = np.array([snr_for_target(rr["rmse"][w][b], SNRS, target)
                        for b in range(len(BW))])
-        return np.nanmean(nb - nw)
-    s_all = [sav(res[c], "average", "disp") for c in counts]
-    s_pool = [sav(res[c], "average_pool", "disp_pool") for c in counts]
-    ax1.plot(counts, s_all, "o-", color=COL["disp"], label="all pairs")
-    ax1.plot(counts, s_pool, "s--", color="#E69F00", label="filtered pool")
+        saving = nb - nw
+        return float(np.nanmean(saving)) if np.any(np.isfinite(saving)) else np.nan
+    s_selection = [sav(res[c], "average", "average_pool") for c in counts]
+    s_all_weight = [sav(res[c], "average", "disp") for c in counts]
+    s_pool_weight = [sav(res[c], "average_pool", "disp_pool") for c in counts]
+    ax1.plot(counts, s_selection, "o-", color="#D55E00",
+             label="pair filtering (equal weights)")
+    ax1.plot(counts, s_all_weight, "s--", color=COL["disp"],
+             label=r"$D^2$ weighting (all pairs)")
+    ax1.plot(counts, s_pool_weight, "D:", color="#E69F00",
+             label=r"$D^2$ weighting (filtered pool)")
     ax1.set_xlabel("Number of channels")
-    ax1.set_ylabel(r"SNR saving of $D^2$ over averaging (dB)")
-    ax1.set_title("Residual value of weighting (RMSE = %.3g km)" % target)
+    ax1.set_ylabel("Energy SNR saved at target RMSE (dB)")
+    ax1.set_title("Selection and weighting gains (RMSE = %.3g km)" % target)
     ax1.legend()
-    fig.suptitle("Effect of removing uninformative pairs (D >= %.2f max D)"
+    fig.suptitle(r"Pair filtering and weighting ($D^2 \geq %.2f\,\max D^2$)"
                  % POOL_ALPHA, y=1.02)
     f = os.path.join(embed_dir, "F7_pool_effect.png")
     fig.savefig(f); plt.close(fig); return f
@@ -362,11 +356,13 @@ def fig8_alpha_sweep(res, counts, BW, SNRS, embed_dir, target=TARGET_RMSE):
     for ci, c in enumerate(counts):
         if "alpha_saving" not in res[c]:
             continue
-        s = np.nanmean(res[c]["alpha_saving"], axis=1)   # (n_alpha,)
+        alpha_saving = res[c]["alpha_saving"]
+        s = np.array([np.nanmean(row) if np.any(np.isfinite(row)) else np.nan
+                      for row in alpha_saving])
         ax.plot(ALPHAS, s, marker=mk[ci % len(mk)], color=cmap[ci], label="%d ch" % c)
     ax.axhline(0, color="k", lw=0.8)
-    ax.set_xlabel(r"filter threshold $\alpha$   ($D \geq \alpha\,\max D$;  0 = all pairs)")
-    ax.set_ylabel(r"SNR saving of $D^2$ over averaging (dB)")
+    ax.set_xlabel(r"filter threshold $\alpha$   ($D^2 \geq \alpha\,\max D^2$;  0 = all pairs)")
+    ax.set_ylabel(r"Energy SNR saving of $D^2$ over averaging (dB)")
     ax.set_title("Weighting benefit vs pair-selection threshold (RMSE = %.3g km)" % target)
     ax.legend(title="channels")
     f = os.path.join(embed_dir, "F8_alpha_sweep.png")
@@ -385,23 +381,27 @@ def _load_res(run_dir, replot):
             d = np.load(f, allow_pickle=True)
             n = int(os.path.basename(f).rsplit("_", 1)[1].replace("ch.npz", ""))
             counts.append(n)
+            if ("snr_definition" in d.files and
+                    str(d["snr_definition"].item()) ==
+                    crb.ENERGY_SNR_DEFINITION):
+                SNRS = d["SNRS_dB"]
+            else:
+                SNRS = energy_snr_axis_for_run(run_dir, n, d["SNRS_dB"])
             keys = [k for k in (ESTS + POOL_ESTS) if ("rmse_" + k) in d.files]
             res[n] = dict(
-                BW=d["BANDWIDTHS"], SNRS=d["SNRS_dB"],
+                BW=d["BANDWIDTHS"], SNRS=SNRS,
                 rmse={k: d["rmse_" + k] for k in keys},
                 bias={k: d["bias_" + k] for k in keys},
                 std={k: d["std_" + k] for k in keys},
                 mae={k: d["mae_" + k] for k in keys},
-                success={k: d["success_" + k] for k in keys},
-                crb=np.nanmean(d["crb_star"] if "crb_star" in d.files
-                               else d["crb_gls"], axis=0))
+                success={k: d["success_" + k] for k in keys})
             if "alpha_saving" in d.files:
                 res[n]["alpha_saving"] = d["alpha_saving"]
             est_keys = [k for k in (ESTS + POOL_ESTS) if ("est_" + k) in d.files]
             f5_all[n] = dict(est={k: d["est_" + k] for k in est_keys},
                              D=d["pair_D_abs"], kbest=int(d["kbest"]),
                              Ztrue=float(d["event_distance_km"]),
-                             BW=d["BANDWIDTHS"], SNRS=d["SNRS_dB"], n=n)
+                              BW=d["BANDWIDTHS"], SNRS=SNRS, n=n)
         return res, sorted(counts), (f5_all[max(counts)] if counts else None)
 
     files = sorted(glob.glob(os.path.join(run_dir, "crb_results_*ch.npz")))
@@ -410,15 +410,15 @@ def _load_res(run_dir, replot):
         if "pair_Z" not in d.files:
             print("skip (no pair_Z):", f); continue
         n = int(d["channel_indices_full"].shape[0]); counts.append(n)
-        BW = d["BANDWIDTHS"]; SNRS = d["SNRS_dB"]
+        BW = d["BANDWIDTHS"]
+        SNRS = energy_snr_axis_for_run(run_dir, n, d["SNRS_dB"])
         Ztrue = float(d["event_distance_km"])
         D = d["D_abs"]; D2 = D ** 2; kbest = int(np.argmax(D))
         tol = 0.01 * Ztrue
-        print("count %2d: computing estimators + GLS bound..." % n)
+        print("count %2d: recomputing fusion metrics from saved pair estimates..." % n)
 
         est = combine_estimators(d["pair_Z"], D2, kbest)
         surf = {k: metrics(v, Ztrue, tol) for k, v in est.items()}
-        crb_star = crb_bound(d)
 
         # ---- alpha sweep: residual weighting gain vs filter threshold ----
         alpha_saving = np.full((len(ALPHAS), len(BW)), np.nan)
@@ -434,21 +434,21 @@ def _load_res(run_dir, replot):
         res[n] = dict(BW=BW, SNRS=SNRS, toll=tol,
                       rmse={k: surf[k]["rmse"] for k in est},
                       bias={k: surf[k]["bias"] for k in est},
-                      std={k: surf[k]["std"] for k in est},
-                      mae={k: surf[k]["mae"] for k in est},
-                      success={k: surf[k]["success"] for k in est},
-                      crb=np.nanmean(crb_star, axis=0),
-                      alpha_saving=alpha_saving)
+                       std={k: surf[k]["std"] for k in est},
+                       mae={k: surf[k]["mae"] for k in est},
+                       success={k: surf[k]["success"] for k in est},
+                       alpha_saving=alpha_saving)
         f5_all[n] = dict(est=est, D=D, kbest=kbest, Ztrue=Ztrue, BW=BW,
                          SNRS=SNRS, n=n)
 
         np.savez_compressed(
             os.path.join(run_dir, "estcomp_%dch.npz" % n),
-            BANDWIDTHS=BW, SNRS_dB=SNRS, event_distance_km=Ztrue, tol=tol,
+            BANDWIDTHS=BW, SNRS_dB=SNRS,
+            snr_definition=crb.ENERGY_SNR_DEFINITION,
+            event_distance_km=Ztrue, tol=tol,
             pair_D_abs=D, kbest=kbest, alphas=np.array(ALPHAS),
             alpha_saving=alpha_saving,
             **{("est_" + k): v.astype(np.float32) for k, v in est.items()},
-            crb_star=crb_star,
             **{("rmse_" + k): surf[k]["rmse"] for k in est},
             **{("bias_" + k): surf[k]["bias"] for k in est},
             **{("std_" + k): surf[k]["std"] for k in est},
@@ -474,7 +474,7 @@ def main(run_dir, replot=False):
             fig2_ratio_maps(res, counts, BW, SNRS, embed_dir),
             fig3_snr_saving(res, counts, BW, SNRS, embed_dir),
             fig4_snr_vs_channels(res, counts, BW, SNRS, embed_dir),
-            fig6_gap(res, counts, BW, SNRS, embed_dir)]
+            fig6_bias_variance(res, counts, BW, SNRS, embed_dir)]
     if f5 is not None:
         made.append(fig5_distributions(f5, embed_dir))
     if "disp_pool" in res[counts[-1]]["rmse"]:

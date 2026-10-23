@@ -3,8 +3,10 @@
 Compare several runs (same Jones data / noise seeds), e.g. no-filter vs
 low-pass vs band-pass.
 
-Shows that a linear filter does not move the CRB but changes the threshold SNR
-at which the estimator reaches it.
+Plots filtered estimators against the unfiltered-data reference. A lossy filter
+can change the Fisher information of the processed observation; this script does
+not recompute a filtered-data CRB, so interpret the dashed curve as a reference,
+not as the exact bound after filtering.
 
 Run:  python compare_filters.py cfg_none.yaml cfg_lowpass.yaml cfg_bandpass.yaml
 """
@@ -16,7 +18,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import yaml
 
-from crb import star_combined_crb_distance
+import crb
+from snr_conventions import energy_snr_axis_from_result
 
 plt.rcParams.update({"font.size": 13, "figure.dpi": 150, "savefig.dpi": 150,
                      "savefig.bbox": "tight"})
@@ -39,20 +42,24 @@ def main(configs, count=8, bw_frac=0.8):
         BW = d["BANDWIDTHS"]
         ib = int(len(BW) * bw_frac)
         std = np.nanmean(np.nanstd(d["est_crb"], axis=-1), axis=0)[ib]
-        ax.loglog(d["SNRS_dB"], std, "o-", ms=4, label="sim: %s" % mode)
+        snrs = energy_snr_axis_from_result(d, d["SNRS_dB"], cfg)
+        ax.loglog(snrs, std, "o-", ms=4, label="sim: %s" % mode)
 
-    # CRB (star) from the first run
+    # Additive channel-timing model reference from the first run.
     cd, D, pairs = d0["crb_delay_pairs"], d0["D_abs"], d0["pair_indices"]
     nf = cd.shape[0]
-    star = np.array([
-        np.nanmean([star_combined_crb_distance(cd[f, ib, s], D, pairs, count)
+    joint = np.array([
+        np.nanmean([crb.gls_combined_crb_distance(cd[f, ib, s], D,
+                                                  pairs, count)[0]
                     for f in range(nf)])
         for s in range(len(d0["SNRS_dB"]))])
-    ax.loglog(d0["SNRS_dB"], star, "k--", label="CRB (star-combined)")
+    joint_snr = energy_snr_axis_from_result(d0, d0["SNRS_dB"], cfg)
+    ax.loglog(joint_snr, joint, "k--",
+              label="additive timing-model reference")
 
-    ax.set_xlabel("SNR (dB)")
+    ax.set_xlabel("Energy SNR (dB)")
     ax.set_ylabel("Std (km)")
-    ax.set_title("%d ch | filter comparison, B=%.3g Hz" % (count, BW[ib]))
+    ax.set_title("%d ch | filter comparison, nominal B=%.3g Hz" % (count, BW[ib]))
     ax.grid(True, which="both", alpha=0.3)
     ax.legend()
     out = os.path.join(yaml.safe_load(open(configs[0]))["output"]["run_dir"],
