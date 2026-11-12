@@ -62,6 +62,21 @@ the fibre instead of the instrument. It is small against the 72 deg/nm of the fi
 it is systematic, not noise. A single register write is enough; resolution is 0.01 THz (~0.08 nm),
 so it can follow a continuous sweep.
 
+**Is a spectral SOP trajectory measurable without a fibre spool?** Yes, and it does not need
+one. What sets the rotation *rate* is the deterministic differential group delay of the fixed
+short link, not the statistical PMD of a long reel: 1.6 ps already gives 72 deg/nm. Measured
+evidence: (a) the 29 calibration matrices give a rigid Stokes rotation of 71.9 +- 2.4 deg/nm
+about a fixed axis; (b) a direct fixed-SOP sweep over 0.5 nm gave a 25.9 deg chord. Because the
+change is a *rigid* rotation (residual after rotation 0.5-6 %), the dispersion sits **after the
+last grating** - between taps it would distort the tetrahedron instead of rotating it - i.e. in
+the device pigtail, patch cord and coupler. Practical limit is SNR, not DGD: single PM1000 reads
+jitter by ~7 deg while a 0.01 nm step rotates by ~0.7 deg, so a sweep must average (6-10 reads)
+and/or span a full revolution (5 nm ~ 360 deg). Tooling added: `laser_agent.py` (persistent SCPI
+session, removes the per-point interpreter spawn that made the sweep slow), averaging and read
+retries in `sweep_trajectory.py`, and `plot_trajectory_alignment.py` (Kabsch alignment, two
+Poincare-sphere figures viewed along the PMD axis), validated on synthetic data: an injected
+24 deg mis-framing is recovered as 23.9 deg and the RMS falls from 18.1 deg to 1.7 deg.
+
 **Consequences:**
 - A per-wavelength calibration is valid at *its own* wavelength only (1 nm away is already
   72 deg off). A 1 nm lookup table is therefore the safe approach.

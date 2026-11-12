@@ -5,7 +5,9 @@ Covers the parts of ``scope_probe.py`` and ``discover_laser.py`` that can be
 verified without instruments: scale arithmetic, clipping/headroom decisions, and
 TCP discovery against the fake CoBrite from ``test_cobrite``.
 """
+import csv
 import ipaddress
+import os
 import unittest
 
 import discover_laser
@@ -233,3 +235,90 @@ class CrossWavelengthTests(unittest.TestCase):
         np.testing.assert_allclose(result["mean_angle_deg"], 0.0, atol=1e-6)
         self.assertEqual(result["wavelengths_nm"], [1530.0, 1550.0])
         self.assertLess(float(np.nanmax(result["normalized_stokes_rmse"])), 1e-9)
+
+
+class TrajectoryPlotTests(unittest.TestCase):
+    """The alignment figure must recover a known rotation, without hardware."""
+
+    def _synthetic(self, tmpdir):
+        import numpy as np
+
+        rng = np.random.default_rng(3)
+        n = 24
+        wavelengths = np.linspace(1548.0, 1549.0, n)
+        axis = np.array([0.93, -0.26, -0.26]); axis /= np.linalg.norm(axis)
+        perp = np.cross(axis, [0.0, 0.0, 1.0]); perp /= np.linalg.norm(perp)
+        other = np.cross(axis, perp)
+        theta = np.radians(72.0 * (wavelengths - wavelengths[0]))
+        stokes = (np.outer(np.cos(theta), perp) + np.outer(np.sin(theta), other)) * 300.0
+        stokes += rng.normal(scale=1.0, size=stokes.shape)
+
+        true_matrix = np.array([[3e3, 2e3, 1.5e3, 1e3],
+                                [-2.4e4, -2.2e4, 1.9e4, 4.2e4],
+                                [-5.2e4, 2.4e4, 2.8e4, -1.7e4],
+                                [3.2e3, -4.5e4, 4.7e4, -1.5e4]])
+        detector = np.linalg.pinv(true_matrix) @ np.column_stack(
+            [np.full(n, 360.0), stokes]).T
+
+        # hand the plotter a matrix seen through a known 24 deg rotation
+        angle = np.radians(24.0)
+        unit_axis = np.array([0.3, -0.8, 0.5]); unit_axis /= np.linalg.norm(unit_axis)
+        k = np.array([[0, -unit_axis[2], unit_axis[1]],
+                      [unit_axis[2], 0, -unit_axis[0]],
+                      [-unit_axis[1], unit_axis[0], 0]])
+        rotation = np.eye(3) + np.sin(angle) * k + (1 - np.cos(angle)) * (k @ k)
+        wrong = true_matrix.copy()
+        wrong[1:4] = rotation @ true_matrix[1:4]
+
+        csv_path = os.path.join(tmpdir, "trajectory.csv")
+        with open(csv_path, "w", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["wavelength_nm", "S0", "S1", "S2", "S3",
+                             "ch1", "ch2", "ch3", "ch4", "dop"])
+            for i in range(n):
+                writer.writerow([wavelengths[i], 360.0, *stokes[i], *detector[:, i], 1.0])
+        matrix_path = os.path.join(tmpdir, "matrix.csv")
+        np.savetxt(matrix_path, wrong, delimiter=",")
+        return csv_path, matrix_path
+
+    def test_kabsch_recovers_known_rotation(self):
+        import numpy as np
+        import plot_trajectory_alignment as plot
+
+        rng = np.random.default_rng(5)
+        points = rng.normal(size=(20, 3))
+        points /= np.linalg.norm(points, axis=1, keepdims=True)
+        angle = np.radians(37.0)
+        axis = np.array([0.2, 0.9, -0.4]); axis /= np.linalg.norm(axis)
+        k = np.array([[0, -axis[2], axis[1]], [axis[2], 0, -axis[0]], [-axis[1], axis[0], 0]])
+        rotation = np.eye(3) + np.sin(angle) * k + (1 - np.cos(angle)) * (k @ k)
+        target = points @ rotation.T
+        recovered = plot.kabsch(points, target)
+        np.testing.assert_allclose(recovered, rotation, atol=1e-9)
+        recovered_angle, recovered_axis = plot.axis_angle(recovered)
+        self.assertAlmostEqual(recovered_angle, 37.0, places=6)
+        self.assertGreater(abs(float(recovered_axis @ axis)), 0.999)
+
+    def test_figures_are_written_and_alignment_improves(self):
+        import tempfile
+        import numpy as np
+        import plot_trajectory_alignment as plot
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path, matrix_path = self._synthetic(tmpdir)
+            outdir = os.path.join(tmpdir, "figures")
+            code = plot.main(["--csv", csv_path, "--matrix", matrix_path,
+                              "--outdir", outdir, "--dpi", "60"])
+            self.assertEqual(code, 0)
+            self.assertTrue(os.path.isfile(os.path.join(outdir, "trajectory_before.png")))
+            self.assertTrue(os.path.isfile(os.path.join(outdir, "trajectory_after.png")))
+
+            data = plot.load_trajectory(csv_path)
+            reference = plot.unit(np.column_stack([data["S1"], data["S2"], data["S3"]]))
+            matrix = np.loadtxt(matrix_path, delimiter=",")
+            detector = np.column_stack([data["ch1"], data["ch2"], data["ch3"], data["ch4"]])
+            dut = plot.unit(np.array([(matrix @ d)[1:4] for d in detector]))
+            before = plot.rms_deg(reference, dut)
+            after = plot.rms_deg(reference, dut @ plot.kabsch(dut, reference).T)
+            self.assertGreater(before, 15.0)      # the injected mis-framing
+            self.assertLess(after, 2.5)           # back to the noise floor
