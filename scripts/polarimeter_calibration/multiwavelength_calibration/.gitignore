@@ -1,0 +1,15 @@
+# Sweep outputs ARE the scientific record (matrices, metrics, raw pairs, reports),
+# so runs/ is tracked. Only scratch and synthetic artefacts are skipped.
+__pycache__/
+*.pyc
+_sim_runs/
+runs_sim/
+runs/**/_stale/
+runs/**/truth_calibration_*.csv
+
+# The parent directory ignores *.csv / *.png globally; re-include the run record.
+!runs/
+!runs/**/*.csv
+!runs/**/*.json
+!runs/**/*.npz
+!runs/**/*.png

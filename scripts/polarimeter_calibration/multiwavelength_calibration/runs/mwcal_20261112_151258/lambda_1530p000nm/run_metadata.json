@@ -1,0 +1,186 @@
+{
+  "calibration_matrix": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\multiwavelength_calibration\\runs\\mwcal_20261112_151258\\lambda_1530p000nm\\calibration_1530.000nm.csv",
+  "ch_scales_v_per_div": [
+    0.02,
+    0.02,
+    0.02,
+    0.02
+  ],
+  "conditioning": {
+    "condition": 6.471607194797063,
+    "condition_polarization": 1.4147734036756636,
+    "condition_row_scaled": 1.336031964001696,
+    "gain_max": 68104.68589309262,
+    "gain_min": 10523.612426268133,
+    "issues": [],
+    "max_condition": 3.0,
+    "rank": 4,
+    "row_norm_ratio": 6.202211965882568,
+    "row_norms": [
+      10662.230987763322,
+      52269.26248634263,
+      66129.41661530959,
+      58878.577721021575
+    ],
+    "row_orthogonality": 0.9566298798246292,
+    "row_orthogonality_polarization": 0.9687219974601596,
+    "singular_values": [
+      68104.68589309262,
+      60148.34022341613,
+      48153.17368675955,
+      10523.612426268133
+    ],
+    "singular_values_polarization": [
+      68097.9797415812,
+      60147.27650435981,
+      48133.48877258979
+    ],
+    "singular_values_row_scaled": [
+      1.1402807638126244,
+      1.0288685475312307,
+      0.9553825469666029,
+      0.8534831460148935
+    ],
+    "status": "excellent"
+  },
+  "detector_csv": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\multiwavelength_calibration\\runs\\mwcal_20261112_151258\\lambda_1530p000nm\\detector_readings_20261112_151331.csv",
+  "laser": {
+    "actual_power_dbm": 10.03,
+    "busy_polls": 7,
+    "limits_nm": [
+      1524.498,
+      1572.063
+    ],
+    "link": "serial COM4 @ 115200 baud",
+    "max_power_dbm": 10.0,
+    "note": "",
+    "output": "1,1,1",
+    "output_enabled": true,
+    "power_setpoint_dbm": 10.0,
+    "readback_nm": 1530.0,
+    "readback_source": "CoBrite SCPI WAV?",
+    "requested_nm": 1530.0,
+    "settle_s": 10.608881799969822
+  },
+  "metrics": {
+    "calibration_matrix_condition": 6.471607194797063,
+    "conditioning": {
+      "condition": 6.471607194797063,
+      "condition_polarization": 1.4147734036756636,
+      "condition_row_scaled": 1.336031964001696,
+      "gain_max": 68104.68589309262,
+      "gain_min": 10523.612426268133,
+      "issues": [],
+      "max_condition": 3.0,
+      "rank": 4,
+      "row_norm_ratio": 6.202211965882568,
+      "row_norms": [
+        10662.230987763322,
+        52269.26248634263,
+        66129.41661530959,
+        58878.577721021575
+      ],
+      "row_orthogonality": 0.9566298798246292,
+      "row_orthogonality_polarization": 0.9687219974601596,
+      "singular_values": [
+        68104.68589309262,
+        60148.34022341613,
+        48153.17368675955,
+        10523.612426268133
+      ],
+      "singular_values_polarization": [
+        68097.9797415812,
+        60147.27650435981,
+        48133.48877258979
+      ],
+      "singular_values_row_scaled": [
+        1.1402807638126244,
+        1.0288685475312307,
+        0.9553825469666029,
+        0.8534831460148935
+      ],
+      "status": "excellent"
+    },
+    "conditioning_training": {
+      "condition": 6.463960611559859,
+      "condition_polarization": 1.4140069389210792,
+      "condition_row_scaled": 1.3364700096082966,
+      "gain_max": 67824.85569461252,
+      "gain_min": 10492.770573712589,
+      "issues": [],
+      "max_condition": 3.0,
+      "rank": 4,
+      "row_norm_ratio": 6.222804207136897,
+      "row_norms": [
+        10634.681215579501,
+        51815.97805431308,
+        66177.53900986785,
+        58796.10113102234
+      ],
+      "row_orthogonality": 0.9585140204416425,
+      "row_orthogonality_polarization": 0.970904358394376,
+      "singular_values": [
+        67824.85569461252,
+        60176.40244148368,
+        47988.868592487735,
+        10492.770573712589
+      ],
+      "singular_values_polarization": [
+        67820.7117201979,
+        60176.39216242263,
+        47963.49286089551
+      ],
+      "singular_values_row_scaled": [
+        1.1367922599762617,
+        1.0160749833106382,
+        0.9755953299288153,
+        0.8505931684239153
+      ],
+      "status": "excellent"
+    },
+    "detector_training_condition": 14.105221612127737,
+    "detector_training_rank": 4,
+    "n_measurements": 30,
+    "n_training": 22,
+    "n_validation": 8,
+    "training": {
+      "angular_max_deg": 3.5730925899557904,
+      "angular_mean_deg": 1.4654173398395258,
+      "angular_std_deg": 0.9026260080482389,
+      "dop_error_std": 0.020386602078788656,
+      "dop_mae": 0.016599527817383698,
+      "normalized_stokes_rmse": 0.01825928857310215,
+      "reconstructed_dop_mean": 1.0072140401693892,
+      "reconstructed_dop_std": 0.01814662021354876,
+      "reference_dop_mean": 1.008068858337156,
+      "reference_dop_std": 0.022121304679977208,
+      "relative_residual": 0.02671806092537377
+    },
+    "validation": {
+      "angular_max_deg": 3.5117150042867213,
+      "angular_mean_deg": 2.211525717516584,
+      "angular_std_deg": 1.0943373354043435,
+      "dop_error_std": 0.03225585707364646,
+      "dop_mae": 0.027965705682637357,
+      "normalized_stokes_rmse": 0.0271678165098813,
+      "reconstructed_dop_mean": 1.0069541116288292,
+      "reconstructed_dop_std": 0.023546200894227296,
+      "reference_dop_mean": 1.0014951640960248,
+      "reference_dop_std": 0.020438421095344765,
+      "relative_residual": 0.037320308616561076
+    }
+  },
+  "pm1000": {
+    "wavelength_encoding": "thz0.01",
+    "wavelength_register": 69
+  },
+  "requested_wavelength_nm": 1530.0,
+  "scope": {
+    "ip": "169.254.102.200",
+    "resource": null,
+    "timeout_s": 30.0,
+    "transport": "pyvisa"
+  },
+  "simulated": false,
+  "stokes_csv": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\multiwavelength_calibration\\runs\\mwcal_20261112_151258\\lambda_1530p000nm\\stokes_20261112_151331.csv"
+}

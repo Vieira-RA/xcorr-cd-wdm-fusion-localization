@@ -1,0 +1,2 @@
+wavelength_nm,status,condition,condition_row_scaled,condition_polarization,row_orthogonality,row_norm_ratio,rank,matrix_file,issues
+1550.0,excellent,6.473335872700265,1.4874606138052846,1.496811507641289,0.9191852238071707,5.7115179547079435,4,C:\Users\240404662\PhD_Code\xcorr-cd-wdm-fusion-localization\scripts\polarimeter_calibration\multiwavelength_calibration\runs\mwcal_20261112_145503\lambda_1550p000nm\calibration_1550.000nm.csv,

@@ -17,15 +17,14 @@ import statistics
 from datetime import datetime
 
 import numpy as np
-import vxi11
-from vxi11.vxi11 import Vxi11Exception
+from scope_io import open_scope, ScopeError, ScopeTimeout
 
 import Python_USB
 import matlab
 
 # ================= Configuration =================
 # --- Oscilloscope ---
-SCOPE_IP = "198.192.1.1"
+SCOPE_IP = os.environ.get("PM_SCOPE_IP", "198.192.1.1")   # PM_SCOPE_RESOURCE=USB0::... for USB
 CHANNELS = [1, 2, 3, 4]
 CH_SCALES = {1: .02, 2: .02, 3: .02, 4: .02}   # V/div - adjust per channel if needed
 SCOPE_TIMEOUT = 30.0
@@ -61,23 +60,7 @@ PM_CSV = f"stokes_{RUN_ID}.csv"
 # ================= Oscilloscope =================
 def read_curve(scope):
     """Read the current channel's CURVE? block and return raw int8 samples."""
-    scope.write("CURVE?")
-    hdr = scope.read_raw(2)
-    if hdr[:1] != b"#":
-        raise RuntimeError(f"Unexpected CURVE? header: {hdr!r}")
-    n_digits = int(hdr[1:2])
-    byte_count = int(scope.read_raw(n_digits).decode("ascii"))
-    data = scope.read_raw(byte_count)
-
-    saved = scope.timeout
-    scope.timeout = 0.5
-    try:
-        scope.read_raw(1)          # consume optional trailing newline
-    except Vxi11Exception:
-        pass
-    finally:
-        scope.timeout = saved
-
+    data = scope.read_block("CURVE?")
     return np.frombuffer(data, dtype=np.int8).astype(float)
 
 
@@ -98,8 +81,7 @@ def read_scope_means(scope):
 
 def init_scope():
     """Configure the scope and return (scope, actual_time_window_s)."""
-    scope = vxi11.Instrument(SCOPE_IP)
-    scope.timeout = SCOPE_TIMEOUT
+    scope = open_scope(SCOPE_IP, timeout=SCOPE_TIMEOUT)
     print(scope.ask("*IDN?"))
 
     for ch in CHANNELS:

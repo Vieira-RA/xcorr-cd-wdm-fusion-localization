@@ -1,0 +1,73 @@
+{
+  "gate": 3.0,
+  "matrices": [
+    {
+      "conditioning": {
+        "condition": 6.473335872700265,
+        "condition_polarization": 1.496811507641289,
+        "condition_row_scaled": 1.4874606138052846,
+        "gain_max": 74009.06125312902,
+        "gain_min": 11432.909199914131,
+        "issues": [],
+        "max_condition": 3.0,
+        "rank": 4,
+        "row_norm_ratio": 5.7115179547079435,
+        "row_norms": [
+          11677.10495769777,
+          56778.16316859474,
+          66067.08932292352,
+          66693.99462489995
+        ],
+        "row_orthogonality": 0.9191852238071707,
+        "row_orthogonality_polarization": 0.9382132063023162,
+        "singular_values": [
+          74009.06125312902,
+          64195.682342249325,
+          49436.07601632767,
+          11432.909199914131
+        ],
+        "singular_values_polarization": [
+          73981.70604860263,
+          64190.862853254854,
+          49426.20074132431
+        ],
+        "singular_values_row_scaled": [
+          1.2149373342560612,
+          0.9955173942740941,
+          0.9304475589910796,
+          0.8167862214166177
+        ],
+        "status": "excellent"
+      },
+      "matrix": [
+        [
+          7178.45158251,
+          6841.54110581,
+          5535.87058966,
+          2715.15472537
+        ],
+        [
+          -24518.5032799,
+          -22318.4213775,
+          19070.8194896,
+          41961.8245662
+        ],
+        [
+          -52151.7358066,
+          24051.4343458,
+          27688.0387524,
+          -17319.2886666
+        ],
+        [
+          3178.45585241,
+          -44585.907341,
+          47241.3772496,
+          -14776.1794643
+        ]
+      ],
+      "matrix_file": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\multiwavelength_calibration\\runs\\mwcal_20261112_145503\\lambda_1550p000nm\\calibration_1550.000nm.csv",
+      "wavelength_nm": 1550.0
+    }
+  ],
+  "n_matrices": 1
+}

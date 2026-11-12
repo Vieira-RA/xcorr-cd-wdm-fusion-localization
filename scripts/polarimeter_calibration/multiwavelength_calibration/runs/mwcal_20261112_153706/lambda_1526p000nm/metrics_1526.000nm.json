@@ -1,0 +1,118 @@
+{
+  "conditioning_status": "excellent",
+  "detector_csv": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\multiwavelength_calibration\\runs\\mwcal_20261112_153706\\lambda_1526p000nm\\detector_readings_20261112_153739.csv",
+  "equation": "S_uW = C @ D_volts",
+  "matrix_file": "calibration_1526.000nm.csv",
+  "max_condition": 3.0,
+  "metrics": {
+    "calibration_matrix_condition": 6.290568593003254,
+    "conditioning": {
+      "condition": 6.290568593003254,
+      "condition_polarization": 1.3563706880082667,
+      "condition_row_scaled": 1.2979285284373887,
+      "gain_max": 65926.66263797117,
+      "gain_min": 10480.239053636382,
+      "issues": [],
+      "max_condition": 3.0,
+      "rank": 4,
+      "row_norm_ratio": 5.970790986697792,
+      "row_norms": [
+        10601.146142201933,
+        52295.98056203166,
+        63297.22783452537,
+        60047.538997788535
+      ],
+      "row_orthogonality": 0.9616964266712015,
+      "row_orthogonality_polarization": 0.9723866196357759,
+      "singular_values": [
+        65926.66263797117,
+        60334.212917885096,
+        48611.957048410884,
+        10480.239053636382
+      ],
+      "singular_values_polarization": [
+        65919.50615398843,
+        60330.606776440836,
+        48599.91942968519
+      ],
+      "singular_values_row_scaled": [
+        1.0954737851759428,
+        1.0635577065963417,
+        0.9779659704265458,
+        0.8440170326595821
+      ],
+      "status": "excellent"
+    },
+    "conditioning_training": {
+      "condition": 6.309886073747511,
+      "condition_polarization": 1.3560693030724926,
+      "condition_row_scaled": 1.305521612019828,
+      "gain_max": 66048.30974443357,
+      "gain_min": 10467.433004730425,
+      "issues": [],
+      "max_condition": 3.0,
+      "rank": 4,
+      "row_norm_ratio": 5.9633478917353315,
+      "row_norms": [
+        10593.3295376643,
+        52409.96630852557,
+        63171.70936488802,
+        59953.749456466576
+      ],
+      "row_orthogonality": 0.9608830742996219,
+      "row_orthogonality_polarization": 0.9720105076794989,
+      "singular_values": [
+        66048.30974443357,
+        59992.61178307604,
+        48714.2719822944,
+        10467.433004730425
+      ],
+      "singular_values_polarization": [
+        66041.39051041176,
+        59989.22966312317,
+        48700.60133414975
+      ],
+      "singular_values_row_scaled": [
+        1.0983020514922108,
+        1.0595654200790525,
+        0.9814840431164906,
+        0.841274507737165
+      ],
+      "status": "excellent"
+    },
+    "detector_training_condition": 10.924399784852405,
+    "detector_training_rank": 4,
+    "n_measurements": 50,
+    "n_training": 38,
+    "n_validation": 12,
+    "training": {
+      "angular_max_deg": 7.2916048202200265,
+      "angular_mean_deg": 2.5617468801958734,
+      "angular_std_deg": 1.6577760508397505,
+      "dop_error_std": 0.030429648170965995,
+      "dop_mae": 0.02515777043528386,
+      "normalized_stokes_rmse": 0.030841321792743962,
+      "reconstructed_dop_mean": 1.0055288082220781,
+      "reconstructed_dop_std": 0.02509465120457582,
+      "reference_dop_mean": 1.0074895605771879,
+      "reference_dop_std": 0.01902870166189648,
+      "relative_residual": 0.0425977834866264
+    },
+    "validation": {
+      "angular_max_deg": 5.4089985212914815,
+      "angular_mean_deg": 2.607133882647513,
+      "angular_std_deg": 1.3030496563053475,
+      "dop_error_std": 0.025999394929011363,
+      "dop_mae": 0.021995604012926263,
+      "normalized_stokes_rmse": 0.028530776342688018,
+      "reconstructed_dop_mean": 0.9975596557618229,
+      "reconstructed_dop_std": 0.02572830231635925,
+      "reference_dop_mean": 0.9958808232949071,
+      "reference_dop_std": 0.01549740056582836,
+      "relative_residual": 0.03949817792379383
+    }
+  },
+  "stokes_csv": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\multiwavelength_calibration\\runs\\mwcal_20261112_153706\\lambda_1526p000nm\\stokes_20261112_153739.csv",
+  "validation_file": "validation_1526.000nm.csv",
+  "wavelength_nm": 1526.0
+}

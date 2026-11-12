@@ -1,0 +1,116 @@
+{
+  "wavelengths_nm": [
+    1526.0,
+    1527.0,
+    1528.0,
+    1529.0,
+    1530.0,
+    1531.0,
+    1532.0,
+    1533.0,
+    1534.0,
+    1535.0,
+    1536.0,
+    1537.0,
+    1538.0,
+    1539.0,
+    1540.0,
+    1541.0,
+    1542.0,
+    1543.0,
+    1544.0,
+    1545.0,
+    1546.0,
+    1547.0,
+    1548.0,
+    1549.0,
+    1550.0,
+    1555.0,
+    1560.0,
+    1565.0,
+    1570.0
+  ],
+  "n_sops": 50,
+  "validation_fraction": 0.25,
+  "random_seed": 17,
+  "continue_on_error": false,
+  "simulate": false,
+  "max_condition": 3.0,
+  "fail_on_poor_conditioning": false,
+  "ch_scales": [
+    0.02,
+    0.02,
+    0.02,
+    0.02
+  ],
+  "acquisition_script": "../fused_acquisition_controlled.py",
+  "output_root": "runs",
+  "operator_checklist": [
+    "Laser: 10.00 dBm setpoint, output ON, no alarms (python cobrite.py --transport serial --com-port COM4).",
+    "Scope: VXI-11 server running; port 111 answers at the configured scope.ip.",
+    "Scope: no channel clipping at ch_scales (python scope_probe.py).",
+    "PM1000 + EPS1000: MATLAB Runtime bridge initialises, EPS1000 in stable-SOP mode.",
+    "PM1000 wavelength register: set automatically by the sweep (check the display follows).",
+    "Optical path: one wavelength reaches both the FBG polarimeter and the PM1000."
+  ],
+  "synthetic": {
+    "detector_noise_rel": 0.002,
+    "stokes_noise_rel": 0.002,
+    "power_uw": 100.0,
+    "power_spread": 0.06,
+    "matrix_scale": 3000.0,
+    "s0_scale": 0.25
+  },
+  "laser": {
+    "mode": "cobrite",
+    "output": 1,
+    "tolerance_nm": 0.05,
+    "settle_s": 0.5,
+    "readback_timeout_s": 120.0,
+    "poll_interval_s": 0.25,
+    "cobrite": {
+      "transport": "serial",
+      "com_port": "COM4",
+      "baudrate": 115200,
+      "host": "169.254.9.2",
+      "port": 2000,
+      "address": "1,1,1",
+      "password": "IDP",
+      "timeout_s": 10.0,
+      "min_settle_s": 1.0,
+      "power_dbm": 10.0,
+      "max_power_dbm": 10.0,
+      "enable_output": true,
+      "check_power": true,
+      "power_tolerance_db": 3.0
+    },
+    "headers": {},
+    "response_wavelength_path": "wavelength_nm",
+    "set_request": {
+      "method": "POST",
+      "url": "",
+      "json": {
+        "wavelength_nm": "{wavelength_nm}",
+        "output": "{output}"
+      }
+    },
+    "read_request": {
+      "method": "GET",
+      "url": "",
+      "params": {
+        "output": "{output}"
+      }
+    }
+  },
+  "scope": {
+    "ip": "169.254.102.200",
+    "transport": "pyvisa",
+    "resource": null,
+    "timeout_s": 30.0
+  },
+  "acquisition_python": "C:/Users/240404662/Desktop/Automatic_calibration/pm1000_env/Scripts/python.exe",
+  "pm1000": {
+    "wavelength_register": 69,
+    "wavelength_encoding": "thz0.01"
+  }
+}

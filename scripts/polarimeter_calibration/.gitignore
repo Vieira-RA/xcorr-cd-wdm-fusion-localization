@@ -12,3 +12,6 @@ PM_trajectory_*.txt
 
 # ... but keep the calibration matrix
 !calibration_matrix_reference.csv
+
+# Vendor material: keep locally, do not redistribute in the repository
+cobrite/Manual_CoBrite.pdf

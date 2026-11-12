@@ -1,0 +1,53 @@
+{
+  "acquisition_python": "C:/Users/240404662/Desktop/Automatic_calibration/pm1000_env/Scripts/python.exe",
+  "acquisition_script": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\fused_acquisition_controlled.py",
+  "ch_scales_v_per_div": [
+    0.02,
+    0.02,
+    0.02,
+    0.02
+  ],
+  "config_file": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\multiwavelength_calibration\\config.example.json",
+  "fail_on_poor_conditioning": false,
+  "laser": {
+    "actual_power_dbm": 9.99,
+    "address": "1,1,1",
+    "busy": false,
+    "frequency_thz": 193.4145,
+    "idn": "COBRITE CBDX2-NC-NC-FA, SN 21490028, F/W Ver 1.2.1(160), HW Ver 1.20",
+    "limits_nm": [
+      1524.498,
+      1572.063
+    ],
+    "max_power_dbm": 10.0,
+    "output_state": 1,
+    "power_setpoint_dbm": 10.0,
+    "power_within_limit": true,
+    "transport": "serial COM4 @ 115200 baud",
+    "wavelength_nm": 1550.0
+  },
+  "laser_mode": "cobrite",
+  "max_condition": 3.0,
+  "n_sops": 30,
+  "pm1000": {
+    "wavelength_encoding": "thz0.01",
+    "wavelength_register": 69
+  },
+  "random_seed": 17,
+  "scope": {
+    "ip": "169.254.102.200",
+    "resource": null,
+    "timeout_s": 30.0,
+    "transport": "pyvisa"
+  },
+  "simulated": false,
+  "synthetic": null,
+  "validation_fraction": 0.25,
+  "wavelengths_nm": [
+    1530.0,
+    1540.0,
+    1550.0,
+    1560.0,
+    1570.0
+  ]
+}

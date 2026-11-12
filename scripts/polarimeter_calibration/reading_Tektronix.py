@@ -1,12 +1,12 @@
 import sys
 import csv
+import os
 import time
 import numpy as np
-import vxi11
-from vxi11.vxi11 import Vxi11Exception
+from scope_io import open_scope, ScopeError, ScopeTimeout
 
 # ---------------- Configuration ----------------
-SCOPE_IP = "198.192.1.1"
+SCOPE_IP = os.environ.get("PM_SCOPE_IP", "198.192.1.1")   # PM_SCOPE_RESOURCE=USB0::... for USB
 CSV_FILENAME = "detector_readings.csv"
 CHANNELS = [1, 2, 3, 4]
 CH_SCALES = {1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0}   # V/div - adjust per channel if needed
@@ -20,7 +20,7 @@ else:
     num_measurements = int(input("Enter number of measurements: "))
 
 # ---------------- Connect ----------------
-scope = vxi11.Instrument(SCOPE_IP)
+scope = open_scope(SCOPE_IP, timeout=TIMEOUT)
 scope.timeout = TIMEOUT
 print(scope.ask("*IDN?"))
 
@@ -49,24 +49,7 @@ print(f"Record length: {n_pts}")
 
 def read_curve(scope):
     """Read the current channel's CURVE? block and return raw int8 samples."""
-    scope.write("CURVE?")
-    hdr = scope.read_raw(2)                     # b'#<n>'
-    if hdr[:1] != b"#":
-        raise RuntimeError(f"Unexpected CURVE? header: {hdr!r}")
-    n_digits = int(hdr[1:2])
-    byte_count = int(scope.read_raw(n_digits).decode("ascii"))
-    data = scope.read_raw(byte_count)
-
-    # Consume an optional trailing newline after the binary block.
-    saved = scope.timeout
-    scope.timeout = 0.5
-    try:
-        scope.read_raw(1)
-    except Vxi11Exception:
-        pass
-    finally:
-        scope.timeout = saved
-
+    data = scope.read_block("CURVE?")
     return np.frombuffer(data, dtype=np.int8).astype(float)
 
 

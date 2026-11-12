@@ -1,0 +1,347 @@
+{
+  "gate": 3.0,
+  "matrices": [
+    {
+      "conditioning": {
+        "condition": 6.471607194796517,
+        "condition_polarization": 1.4147734036769894,
+        "condition_row_scaled": 1.336031964004057,
+        "gain_max": 68104.68589309063,
+        "gain_min": 10523.612426268712,
+        "issues": [],
+        "max_condition": 3.0,
+        "rank": 4,
+        "row_norm_ratio": 6.202211965877606,
+        "row_norms": [
+          10662.230987764671,
+          52269.26248634017,
+          66129.41661526504,
+          58878.57772099549
+        ],
+        "row_orthogonality": 0.9566298798241326,
+        "row_orthogonality_polarization": 0.9687219974597245,
+        "singular_values": [
+          68104.68589309063,
+          60148.34022337913,
+          48153.17368671302,
+          10523.612426268712
+        ],
+        "singular_values_polarization": [
+          68097.97974157914,
+          60147.2765043228,
+          48133.48877254323
+        ],
+        "singular_values_row_scaled": [
+          1.140280763813694,
+          1.0288685475309245,
+          0.9553825469662891,
+          0.8534831460141858
+        ],
+        "status": "excellent"
+      },
+      "matrix": [
+        [
+          6068.4603253,
+          6227.86149547,
+          5664.68015086,
+          2445.83296617
+        ],
+        [
+          -13104.6691129,
+          -27216.8536203,
+          13447.6886153,
+          40481.4278185
+        ],
+        [
+          -34518.064695,
+          -12299.2501079,
+          50898.9531789,
+          -20967.3070198
+        ],
+        [
+          38029.1232878,
+          -42047.8902917,
+          14026.5934011,
+          -7463.39708082
+        ]
+      ],
+      "matrix_file": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\multiwavelength_calibration\\runs\\mwcal_20261112_151258\\lambda_1530p000nm\\calibration_1530.000nm.csv",
+      "wavelength_nm": 1530.0
+    },
+    {
+      "conditioning": {
+        "condition": 6.782184928546708,
+        "condition_polarization": 1.4773405028079003,
+        "condition_row_scaled": 1.3493775400097914,
+        "gain_max": 71893.94022099943,
+        "gain_min": 10600.409894220464,
+        "issues": [],
+        "max_condition": 3.0,
+        "rank": 4,
+        "row_norm_ratio": 6.528620196320889,
+        "row_norms": [
+          10627.241884842691,
+          54081.85563071864,
+          69381.22600057127,
+          60971.62729232402
+        ],
+        "row_orthogonality": 0.9550426273207153,
+        "row_orthogonality_polarization": 0.9573687849599175,
+        "singular_values": [
+          71893.94022099943,
+          62605.85208058055,
+          48667.02363403384,
+          10600.409894220464
+        ],
+        "singular_values_polarization": [
+          71892.43653911001,
+          62605.83363541864,
+          48663.416729229306
+        ],
+        "singular_values_row_scaled": [
+          1.119618648402613,
+          1.0359258792495822,
+          0.9924012528473144,
+          0.8297297199673923
+        ],
+        "status": "excellent"
+      },
+      "matrix": [
+        [
+          5320.67724711,
+          6299.03886616,
+          6022.21585904,
+          2946.81000758
+        ],
+        [
+          -4524.6638401,
+          -31358.3259059,
+          9859.39784664,
+          42706.2313495
+        ],
+        [
+          -20736.741656,
+          -30950.8555795,
+          55833.2411979,
+          -17562.3399087
+        ],
+        [
+          51101.9822341,
+          -32000.7510477,
+          -6802.78883833,
+          -5983.37219501
+        ]
+      ],
+      "matrix_file": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\multiwavelength_calibration\\runs\\mwcal_20261112_151258\\lambda_1540p000nm\\calibration_1540.000nm.csv",
+      "wavelength_nm": 1540.0
+    },
+    {
+      "conditioning": {
+        "condition": 7.036828410505347,
+        "condition_polarization": 1.511168265554075,
+        "condition_row_scaled": 1.4119795276270968,
+        "gain_max": 74531.33094458435,
+        "gain_min": 10591.608406042107,
+        "issues": [
+          "polarization path is not balanced (cond 1.511 > 1.5)"
+        ],
+        "max_condition": 3.0,
+        "rank": 4,
+        "row_norm_ratio": 6.601617471647759,
+        "row_norms": [
+          10780.212051542509,
+          54305.538567508054,
+          71166.83622753076,
+          64567.22065079082
+        ],
+        "row_orthogonality": 0.9380314193026322,
+        "row_orthogonality_polarization": 0.9541305372060946,
+        "singular_values": [
+          74531.33094458435,
+          64789.94362193657,
+          49336.70840921191,
+          10591.608406042107
+        ],
+        "singular_values_polarization": [
+          74520.96542874949,
+          64788.4443559477,
+          49313.47959548775
+        ],
+        "singular_values_row_scaled": [
+          1.1339507832626212,
+          1.0637347099771646,
+          0.9683314646258565,
+          0.8030929351846078
+        ],
+        "status": "ok"
+      },
+      "matrix": [
+        [
+          6296.26503363,
+          6412.27185705,
+          5547.78418485,
+          2162.14679708
+        ],
+        [
+          2490.34064234,
+          -30734.7479389,
+          3166.72198456,
+          44589.6497362
+        ],
+        [
+          -9015.66198599,
+          -41548.0750598,
+          55166.4657528,
+          -14623.7797016
+        ],
+        [
+          56672.6811808,
+          -21411.0528578,
+          -21458.5535618,
+          -6183.08053507
+        ]
+      ],
+      "matrix_file": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\multiwavelength_calibration\\runs\\mwcal_20261112_151258\\lambda_1550p000nm\\calibration_1550.000nm.csv",
+      "wavelength_nm": 1550.0
+    },
+    {
+      "conditioning": {
+        "condition": 7.500802999009335,
+        "condition_polarization": 1.5682141548398512,
+        "condition_row_scaled": 1.4164106781187238,
+        "gain_max": 75702.60491553564,
+        "gain_min": 10092.600075689767,
+        "issues": [
+          "polarization path is not balanced (cond 1.568 > 1.5)"
+        ],
+        "max_condition": 3.0,
+        "rank": 4,
+        "row_norm_ratio": 7.0591530070533715,
+        "row_norms": [
+          10133.849749770983,
+          54212.34933622829,
+          71536.39593412289,
+          66647.6357459274
+        ],
+        "row_orthogonality": 0.9380970559635102,
+        "row_orthogonality_polarization": 0.9417968038760195,
+        "singular_values": [
+          75702.60491553564,
+          66614.99905415147,
+          48277.67557370081,
+          10092.600075689767
+        ],
+        "singular_values_polarization": [
+          75700.97939942706,
+          66614.62960565831,
+          48272.09291906805
+        ],
+        "singular_values_row_scaled": [
+          1.1256238402576741,
+          1.0562702064058906,
+          0.9928310929716991,
+          0.7947016057184259
+        ],
+        "status": "ok"
+      },
+      "matrix": [
+        [
+          5365.75939609,
+          5825.88815231,
+          5754.85030871,
+          2616.15405038
+        ],
+        [
+          1362.04058552,
+          -31526.8989532,
+          5150.56039871,
+          43779.5618522
+        ],
+        [
+          -12622.384657,
+          -40469.3585638,
+          56099.2063357,
+          -13162.1204505
+        ],
+        [
+          58351.1859903,
+          -24738.2594732,
+          -19470.1017155,
+          -6780.8628855
+        ]
+      ],
+      "matrix_file": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\multiwavelength_calibration\\runs\\mwcal_20261112_151258\\lambda_1560p000nm\\calibration_1560.000nm.csv",
+      "wavelength_nm": 1560.0
+    },
+    {
+      "conditioning": {
+        "condition": 7.79661420082954,
+        "condition_polarization": 1.5779508330412682,
+        "condition_row_scaled": 1.40594265904282,
+        "gain_max": 75782.52070089076,
+        "gain_min": 9719.926977126519,
+        "issues": [
+          "polarization path is not balanced (cond 1.578 > 1.5)"
+        ],
+        "max_condition": 3.0,
+        "rank": 4,
+        "row_norm_ratio": 7.324228219255112,
+        "row_norms": [
+          9852.832954381294,
+          53723.08081092988,
+          72164.39716408619,
+          65780.76694183995
+        ],
+        "row_orthogonality": 0.9311005714560674,
+        "row_orthogonality_polarization": 0.9435639724769217,
+        "singular_values": [
+          75782.52070089076,
+          66138.95454853636,
+          48023.20807237171,
+          9719.926977126519
+        ],
+        "singular_values_polarization": [
+          75776.24447833178,
+          66127.40686964898,
+          48021.93001938103
+        ],
+        "singular_values_row_scaled": [
+          1.120131934027606,
+          1.1016134575767798,
+          0.9471016895846138,
+          0.7967123885338276
+        ],
+        "status": "ok"
+      },
+      "matrix": [
+        [
+          6028.67329765,
+          5079.63131495,
+          5101.77673147,
+          2983.72843663
+        ],
+        [
+          3349.43093203,
+          -31269.4318168,
+          3753.06713335,
+          43394.5600876
+        ],
+        [
+          -13231.8865551,
+          -40543.7240301,
+          56658.8756625,
+          -13363.9682236
+        ],
+        [
+          57584.1091989,
+          -24178.3820303,
+          -19188.8631678,
+          -7640.22512431
+        ]
+      ],
+      "matrix_file": "C:\\Users\\240404662\\PhD_Code\\xcorr-cd-wdm-fusion-localization\\scripts\\polarimeter_calibration\\multiwavelength_calibration\\runs\\mwcal_20261112_151258\\lambda_1570p000nm\\calibration_1570.000nm.csv",
+      "wavelength_nm": 1570.0
+    }
+  ],
+  "n_matrices": 5
+}
