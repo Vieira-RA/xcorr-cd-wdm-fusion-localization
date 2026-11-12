@@ -51,6 +51,17 @@ DUT taps and the PM1000 (roughly 1 m of non-PM fibre). The earlier 10 nm pilot s
 apparently smooth 38 deg drift simply because 10 nm x 72 deg/nm aliases to ~0 mod 360.
 Input-side birefringence is common-mode and cancels; only the DUT->PM1000 path contributes.
 
+**The PM1000 has its own wavelength-dependence.** Toggling register 69 between the 1526 nm and
+1570 nm encodings at a frozen SOP (8 interleaved pairs, so drift cancels) rotates the *reported*
+Stokes vector by **8.7 +- 0.9 deg** (44 nm, i.e. ~0.2 deg/nm) and changes S0 by **4.5 %**;
+genuine SOP drift over the same test was 1.5 deg. So the register is not a pure responsivity
+scalar: the instrument applies a wavelength-dependent correction of its own measurement. It must
+be set to the actual wavelength for every acquisition (the sweep already does this via
+`pm1000.wavelength_register`), otherwise ~9 deg of the observed rotation would be attributed to
+the fibre instead of the instrument. It is small against the 72 deg/nm of the fibre (0.3 %), but
+it is systematic, not noise. A single register write is enough; resolution is 0.01 THz (~0.08 nm),
+so it can follow a continuous sweep.
+
 **Consequences:**
 - A per-wavelength calibration is valid at *its own* wavelength only (1 nm away is already
   72 deg off). A 1 nm lookup table is therefore the safe approach.
